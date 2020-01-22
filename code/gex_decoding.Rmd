@@ -1,0 +1,295 @@
+---
+title: "Gene Expression Decoding"
+output: html_document
+---
+
+# Gene expression decoding analysis
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries(c("here","ggplot2","rjson"))
+
+code_dir = here("code")
+result_dir = here("ns_gex_decode")
+asd_genelist_dir = here("asd_genelists")
+
+source(file.path(code_dir,"ns_gene_decode.R"))
+source(file.path(code_dir,"genelistOverlap.R"))
+```
+
+Run the decoding in Neurosynth
+
+```{r, warning=FALSE, message=FALSE}
+tissue_type = "full"
+fdr_thresh = 0.05
+
+# run gex decoding for each IC map of interest
+img2use = "IC17"
+nv_id = 319463
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+img2use = "IC04"
+nv_id = 319464
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+img2use = "IC14"
+nv_id = 319465
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+img2use = "diff_IC17_IC04"
+nv_id = 358757
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh, pval_thresh=0.05)
+
+img2use = "add_IC12_IC17"
+nv_id = 358758
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh, pval_thresh=0.05)
+
+img2use = "add_IC04_IC12"
+nv_id = 358759
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh, pval_thresh=0.05)
+
+img2use = "diff_comp_map_grp1_grp2"
+nv_id = 358983
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh, pval_thresh=0.05)
+
+img2use = "add_IC04_IC14"
+nv_id = 358988
+fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh, pval_thresh=0.05)
+
+```
+
+Run enrichment tests with gex decoded lists and ASD-relevant gene lists
+
+```{r, warning=FALSE, message=FALSE}
+kosmicki_2ptv = as.character(read.csv(file.path(asd_genelist_dir,"kosmicki_2dnptv_asdgenes.txt"),header = FALSE)$V1)
+
+kosmicki_1ptv_pli09 = as.character(read.csv(file.path(asd_genelist_dir,"kosmicki_1dnptv_AND_pli0.9_asdgenes.txt"),header = FALSE)$V1)
+
+sfari_genes = as.character(read.csv(file.path(asd_genelist_dir,"sfari_genes_14.01.2020.txt"),header = FALSE)$V1)
+
+
+chd8_1 = as.character(read.csv(file.path(asd_genelist_dir,"CHD8_brain+hnsc_promoterBinding_Cotney_2014_natcommun.txt"),header = FALSE)$V1)
+
+chd8_2 = as.character(read.csv(file.path(asd_genelist_dir,"CHD8_targets_Sugathan.txt"),header = FALSE)$V1)
+
+fmrp_1 = as.character(read.csv(file.path(asd_genelist_dir,"ASDfmrp_interactors_genelist_Darnell_Parikshak.txt"),header = FALSE)$V1)
+
+fmrp_2 = as.character(read.csv(file.path(asd_genelist_dir,"greenblatt_fmrp_all.txt"),header = FALSE)$V1)
+asd_demods_down = as.character(read.csv(file.path(asd_genelist_dir,"parikshak_2016_down_de_modules.txt"),header = FALSE)$V1)
+
+
+asd_demods_up = as.character(read.csv(file.path(asd_genelist_dir,"parikshak_2016_up_de_modules.txt"),header = FALSE)$V1)
+
+
+asd_prenatal_1 = as.character(read.csv(file.path(asd_genelist_dir,"parikshak_2013_M2_M3.txt"),header = FALSE)$V1)
+asd_prenatal_2 = as.character(read.csv(file.path(asd_genelist_dir,"eising_M3_M9_M12.txt"),header = FALSE)$V1)
+
+
+
+
+add_IC04_IC14_genes = as.character(read.csv(file.path(result_dir,"add_IC04_IC14","358988_full_pos_t_fdr0.05.csv"))$symbol)
+IC17genes = as.character(read.csv(file.path(result_dir,"IC17","319463_full_pos_t_fdr0.05.csv"))$symbol)
+IC14genes = as.character(read.csv(file.path(result_dir,"IC14","319465_full_pos_t_fdr0.05.csv"))$symbol)
+IC04genes = as.character(read.csv(file.path(result_dir,"IC04","319464_full_pos_t_fdr0.05.csv"))$symbol)
+diff_IC17_genes = as.character(read.csv(file.path(result_dir,"diff_IC17_IC04","358757_full_pos_t_pval0.0500.csv"))$symbol)
+diff_IC04_genes = as.character(read.csv(file.path(result_dir,"diff_IC17_IC04","358757_full_neg_t_pval0.0500.csv"))$symbol)
+
+add_IC12_IC17_genes = as.character(read.csv(file.path(result_dir,"add_IC12_IC17","358758_full_pos_t_fdr0.05.csv"))$symbol)
+add_IC04_IC12_genes = as.character(read.csv(file.path(result_dir,"add_IC04_IC12","358759_full_pos_t_fdr0.05.csv"))$symbol)
+
+diff_comp_map_grp1_genes = as.character(read.csv(file.path(result_dir,"diff_comp_map_grp1_grp2","358983_full_pos_t_fdr0.05.csv"))$symbol)
+
+diff_comp_map_grp2_genes = as.character(read.csv(file.path(result_dir,"diff_comp_map_grp1_grp2","358983_full_neg_t_fdr0.05.csv"))$symbol)
+
+# geneclasses = list(kosmicki_2ptv,
+#                    kosmicki_1ptv_pli09,
+#                    sfari_genes,
+#                    chd8_1,
+#                    chd8_2,
+#                    fmrp_1,
+#                    fmrp_2,
+#                    asd_demods_down,
+#                    asd_demods_up,
+#                    asd_prenatal_1,
+#                    asd_prenatal_2)
+# 
+# geneclassnames = c("ASD dnPTVs",
+#                    "ASD dnPTVs + pLI >= 0.9",
+#                    "SFARI ASD",
+#                    "CHD8 Targets1",
+#                    "CHD8 Targets2",
+#                    "FMRP Targets1",
+#                    "FMRP Targets2",
+#                    "ASD CTX Downreg",
+#                    "ASD CTX Upreg",
+#                    "ASD Prenatal1",
+#                    "ASD Prenatal2")
+
+geneclasses = list(kosmicki_2ptv,
+                   kosmicki_1ptv_pli09,
+                   sfari_genes,
+                   asd_demods_down,
+                   asd_demods_up)
+
+geneclassnames = c("ASD dnPTVs",
+                   "ASD dnPTVs + pLI >= 0.9",
+                   "SFARI ASD",
+                   "ASD CTX Downreg",
+                   "ASD CTX Upreg")
+
+
+res_colnames =  c("IC17","IC04","IC14","add_IC04_IC14")
+ORmat = data.frame(matrix(nrow = length(geneclasses), 
+                          ncol = length(res_colnames)))
+logPmat = data.frame(matrix(nrow = length(geneclasses), 
+                            ncol = length(res_colnames)))
+Pmat = data.frame(matrix(nrow = length(geneclasses), 
+                         ncol = length(res_colnames)))
+FDRmat = data.frame(matrix(nrow = length(geneclasses), 
+                           ncol = length(res_colnames)))
+colnames(ORmat) = res_colnames
+colnames(logPmat) = res_colnames
+colnames(Pmat) = res_colnames
+colnames(FDRmat) = res_colnames
+rownames(ORmat) = geneclassnames
+rownames(logPmat) = geneclassnames
+rownames(Pmat) = geneclassnames
+rownames(FDRmat) = geneclassnames
+
+backgroundTotal = 20787
+
+for (i in 1:length(geneclasses)){
+  # intersect with background list
+  genes2 = geneclasses[[i]]
+  # mask = is.element(genes2, bglist)
+  genes2 = data.frame(genes2)
+
+  # IC17
+  overlap_res = genelistOverlap(data.frame(IC17genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,1] = overlap_res[[1]]$OR
+  logPmat[i,1] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,1] = overlap_res[[1]]$hypergeo_p
+
+  #IC04
+  overlap_res = genelistOverlap(data.frame(IC04genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,2] = overlap_res[[1]]$OR
+  logPmat[i,2] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,2] = overlap_res[[1]]$hypergeo_p
+
+  # IC14
+  overlap_res = genelistOverlap(data.frame(IC14genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,3] = overlap_res[[1]]$OR
+  logPmat[i,3] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,3] = overlap_res[[1]]$hypergeo_p
+  
+  # # Diff IC17
+  # overlap_res = genelistOverlap(data.frame(diff_IC17_genes),
+  #                               genes2,
+  #                               backgroundTotal,
+  #                               print_result = FALSE,
+  #                               header = FALSE)
+  # ORmat[i,4] = overlap_res[[1]]$OR
+  # logPmat[i,4] = -log10(overlap_res[[1]]$hypergeo_p)
+  # Pmat[i,4] = overlap_res[[1]]$hypergeo_p
+  # 
+  # # Diff IC04
+  # overlap_res = genelistOverlap(data.frame(diff_IC04_genes),
+  #                               genes2,
+  #                               backgroundTotal,
+  #                               print_result = FALSE,
+  #                               header = FALSE)
+  # ORmat[i,5] = overlap_res[[1]]$OR
+  # logPmat[i,5] = -log10(overlap_res[[1]]$hypergeo_p)
+  # Pmat[i,5] = overlap_res[[1]]$hypergeo_p
+  # 
+  # # Add IC12 IC17
+  # overlap_res = genelistOverlap(data.frame(add_IC12_IC17_genes),
+  #                               genes2,
+  #                               backgroundTotal,
+  #                               print_result = FALSE,
+  #                               header = FALSE)
+  # ORmat[i,6] = overlap_res[[1]]$OR
+  # logPmat[i,6] = -log10(overlap_res[[1]]$hypergeo_p)
+  # Pmat[i,6] = overlap_res[[1]]$hypergeo_p
+  # 
+  # # ADD IC04 IC12
+  # overlap_res = genelistOverlap(data.frame(add_IC04_IC12_genes),
+  #                               genes2,
+  #                               backgroundTotal,
+  #                               print_result = FALSE,
+  #                               header = FALSE)
+  # ORmat[i,7] = overlap_res[[1]]$OR
+  # logPmat[i,7] = -log10(overlap_res[[1]]$hypergeo_p)
+  # Pmat[i,7] = overlap_res[[1]]$hypergeo_p
+  # 
+  # # Diff comp map Grp 1
+  # overlap_res = genelistOverlap(data.frame(diff_comp_map_grp1_genes),
+  #                               genes2,
+  #                               backgroundTotal,
+  #                               print_result = FALSE,
+  #                               header = FALSE)
+  # ORmat[i,8] = overlap_res[[1]]$OR
+  # logPmat[i,8] = -log10(overlap_res[[1]]$hypergeo_p)
+  # Pmat[i,8] = overlap_res[[1]]$hypergeo_p
+  # 
+  # # Diff comp map Grp 2
+  # overlap_res = genelistOverlap(data.frame(diff_comp_map_grp2_genes),
+  #                               genes2,
+  #                               backgroundTotal,
+  #                               print_result = FALSE,
+  #                               header = FALSE)
+  # ORmat[i,9] = overlap_res[[1]]$OR
+  # logPmat[i,9] = -log10(overlap_res[[1]]$hypergeo_p)
+  # Pmat[i,9] = overlap_res[[1]]$hypergeo_p
+  
+  # ADD IC04 IC14
+  overlap_res = genelistOverlap(data.frame(add_IC04_IC14_genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,4] = overlap_res[[1]]$OR
+  logPmat[i,4] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,4] = overlap_res[[1]]$hypergeo_p
+
+}
+for (i in 1:dim(Pmat)[2]){
+  FDRmat[,i] = p.adjust(Pmat[,i], method = "fdr")
+}
+
+
+# make figure
+zLIM = c(0,-log10(0.005))
+par(mar = c(6, 8.5, 3, 3))
+WGCNA::labeledHeatmap(Matrix = logPmat,
+                      xLabels = colnames(ORmat),
+                      yLabels = rownames(ORmat),
+                      ySymbols = NULL,
+                      colorLabels = FALSE,
+                      colors = WGCNA::blueWhiteRed(50),
+                      textMatrix = round(ORmat, digits = 2),
+                      setStdMargins = FALSE,
+                      cex.text = 1,
+                      zlim = zLIM)
+```
+
+

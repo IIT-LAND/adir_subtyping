@@ -1,0 +1,393 @@
+---
+title: "procEUAIMS_adi_DSM5.Rmd"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## EU-AIMS ADI-R Subtyping
+
+Here we will subtype EU-AIMS LEAP participants by ADI-R scores. This is a similar analysis to what I did with NDAR data. The first step here is to read in the item-level ADI-R data and score the items by algorithm summary scores. We will then use the algorithm summary scores for subtyping.
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries("readxl","reshape2","here","ggplot2")
+source(here("code","euaims_functions.R"))
+source(here("code","get_ggColorHue.R"))
+
+rootpath = here()
+rawpath = here("raw_data")
+plotpath = here("plots","euaims")
+fname = "ADI-R_V01_2017-10-27_13_04_04.xlsx"
+
+fname2open = file.path(rawpath, fname)
+df = read_excel(fname2open)
+
+df2 = read_excel("/Users/mlombardo/Dropbox/euaims/data/rsfmri_preproc/euaims_preproc.xlsx")
+# df = merge(df,df2[,c("subid","age")], by.x="ID",by.y="subid")
+df = merge(df2[,c("subid","age")],df,by.x="subid",by.y="ID")
+df$age_years = df$age/365 
+
+# run scoring function
+df = scoreADI_DSM5(df)
+#df = scoreADI_DSMIV(df)
+```
+
+
+## Run clustering
+
+```{r, warning=FALSE, message=FALSE}
+bkgrd_vars = c("subid","age","Centre","Schedule","Diagnosis")
+
+# DSM-5------------------------------------------------------------------------
+score_vars = c("A1_sumscore","A1_pct_severity","A2_sumscore","A2_pct_severity","A3_sumscore","A3_pct_severity","A_sum","A_pct_severity","B1_sumscore","B1_pct_severity","B2_sumscore","B2_pct_severity","B3_sumscore","B3_pct_severity","B4_sumscore","B4_pct_severity","B_sum","B_pct_severity")
+
+#total_vars = c("A_sum","Bnv_sum","Bv_sum","C_sum")
+total_vars = c("A_pct_severity","B_pct_severity")
+
+subscale_vars = c("A1_sumscore","A2_sumscore","A3_sumscore","B1_sumscore","B2_sumscore","B3_sumscore","B4_sumscore")
+# DSM-5-----------------------------------------------------------------------
+
+
+# # DSM-IV-----------------------------------------------------------------------
+# score_vars = c("A1_sumscore","A1_pct_severity","A2_sumscore","A2_pct_severity","A3_sumscore","A3_pct_severity","A4_sumscore","A4_pct_severity","A_sum","A_pct_severity","B1_sumscore","B1_pct_severity","B2_sumscore","B2_pct_severity","B3_sumscore","B3_pct_severity","B4_sumscore","B4_pct_severity","B_sum","B_pct_severity","Bnv_sum","Bnv_pct_severity","Bv_sum","Bv_pct_severity","C1_sumscore","C1_pct_severity","C2_sumscore","C2_pct_severity","C3_sumscore","C3_pct_severity","C4_sumscore","C4_pct_severity","C_sum","C_pct_severity")
+# 
+# #total_vars = c("A_sum","Bnv_sum","Bv_sum","C_sum")
+# total_vars = c("A_pct_severity","Bnv_pct_severity","Bv_pct_severity","C_pct_severity")
+# 
+# subscale_vars = c("A1_sumscore","A2_sumscore","A3_sumscore","A4_sumscore","B1_sumscore","B2_sumscore","B3_sumscore","B4_sumscore","C1_sumscore","C2_sumscore","C3_sumscore","C4_sumscore")
+# # DSM-IV-----------------------------------------------------------------------
+
+
+# Run on total algo scores
+df2use = df[,c(bkgrd_vars, total_vars)]
+#df2use = subset(df2use, !(df2use$Centre=="ROME" | df2use$Centre=="KAROLINSKA"))
+
+# #DSM-IV
+# cols2use = c(5:8)
+
+# DSM-5
+cols2use = c(6:7)
+na_mask = rowSums(is.na(df2use[,cols2use]))>0
+
+asd_mask = df2use$Diagnosis=="ASD"
+asd_df = subset(df2use, asd_mask & !na_mask)
+
+
+# cluster datasets
+dS = 0
+data2use = asd_df[,cols2use]
+fname2save = file.path(plotpath,sprintf("clustergram_ADIalgoTotals_ALL_euclidean_ward_deepSplit%d.pdf",dS))
+All_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save)
+table(All_clustResults$dynamicColors)
+
+# # DSM-IV
+# maxScores = c(45,21,18,18)
+
+# DSM-5
+# maxScores = c(57,48)
+# fname2save = file.path(plotpath,sprintf("summaryPlot_ADIalgoTotals_ALL_euclidean_ward_deepSplit%d.pdf",dS))
+# makeSummaryPlot(All_clustResults, fname2save = fname2save)#, transformPercentSeverity = maxScores)
+
+oldColors = c("black","blue","brown","green","red","turquoise","yellow")
+newColors = c("4","2","1","5","3","6","7")
+All_clustResults = relabelClusters(All_clustResults, oldColors, newColors)
+fname2save = file.path(plotpath,sprintf("clustergram_ADIalgoTotals_ALL_euclidean_ward_deepSplit%d.pdf",dS))
+makeClustergram(All_clustResults, fname2save = fname2save)
+# fname2save = file.path(plotpath, sprintf("summaryPlot_ADIalgoTotals_ALL_euclidean_ward_deepSplit%d.pdf",dS))
+# makeSummaryPlot(All_clustResults, fname2save = fname2save)#, transformPercentSeverity = maxScores)
+
+# make plot with all individuals shown as lines
+df4plot = asd_df[,c("subid",total_vars)]
+df4plot$subgrp = factor(All_clustResults$dynamicColors)
+df4plot = data.frame(df4plot)
+df4plot$subid = factor(df4plot$subid)
+df4plot = melt(df4plot,id.vars = c("subid","subgrp"), measure.vars = c("A_pct_severity","B_pct_severity"))
+
+ggcolors = get_ggColorHue(3)
+colors2use = c(ggcolors[1],ggcolors[1],ggcolors[1],ggcolors[2],ggcolors[2],ggcolors[2],ggcolors[3])
+p = ggplot(data = df4plot, aes(x = variable, y = value, colour = subgrp, group = subid)) + facet_grid(. ~ subgrp)
+p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) +
+  scale_colour_manual(values = colors2use) 
+p = p + ylab("Percent Severity") + xlab("ADI-R subscale") + ylim(0,0.8)
+p
+fname2save = file.path(plotpath, sprintf("summaryPlot_IndividualSubs_ADIalgoTotals_euclidean_ward_deepSplit%d.pdf",dS))
+ggsave(filename = fname2save)
+
+All_clustResults$dynamicColors[is.element(All_clustResults$dynamicColors,c("1","2","3"))] = "ASD1"
+All_clustResults$dynamicColors[is.element(All_clustResults$dynamicColors,c("4","5","6"))] = "ASD2"
+All_clustResults$dynamicColors[is.element(All_clustResults$dynamicColors,c("7"))] = "ASD3"
+table(All_clustResults$dynamicColors)
+```
+
+Split data into Discovery and Replication balancing across sites, sex and matching TD discovery and replication cohorts by age.
+
+```{r, warning=FALSE, message=FALSE}
+#-----------------------------------------------------------------------------
+# INCLUDE MANNHEIM
+td_df = df[df$Diagnosis=="TD",1:5]
+# EXCLUDE MANNHEIM
+#td_df = df[df$Diagnosis=="TD" & !df$Centre=="mannheim",1:4]
+#-----------------------------------------------------------------------------
+
+colnames(td_df)[1] = "subid"
+td_df$A_pct_severity = as.numeric(NA)
+td_df$B_pct_severity = as.numeric(NA)
+td_df$subgrp = "td"
+
+asd_df$subgrp = All_clustResults$dynamicColors
+colnames(asd_df)[1] = "subid"
+
+all_data = rbind(td_df,asd_df)
+
+fname = "/Users/mlombardo/Dropbox/euaims/data/rsfmri_preproc/euaims_preproc.xlsx"
+pp_data = read_excel(fname)
+mask = pp_data$notes=="ok"
+pp_data = subset(pp_data, mask)
+
+data2write = merge(pp_data, all_data, by = "subid")
+data2write$age = data2write$age.x
+print(table(data2write$Schedule, data2write$subgrp))
+print(table(data2write$Centre, data2write$subgrp))
+print(table(data2write$sex, data2write$subgrp))
+
+asd_df = merge(pp_data[,c("subid","sex")],asd_df, by = "subid")
+
+#-----------------------------------------------------------------------------
+# # DSM-IV
+# a = findBestSplit(asd_df, seed_range = c(13835,66097,85228,183735,537645,719257,868590,1317027))
+
+#DSM-5 - find best split that balances participants across sites
+a = findBestSplit(asd_df, seed_range = c(172342)) #,300001:500000))
+best_seeds = a$seed[!is.na(a$discrepancy) & a$discrepancy==min(a$discrepancy, na.rm = TRUE)]
+print(best_seeds)
+
+# Split datasets -------------------------------------------------------------
+#rngSeed = best_seeds[2]
+rngSeed = best_seeds[1]
+
+# split Schedule A dataset
+dset2use = subset(asd_df, asd_df$Schedule=="A")
+# tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed)
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+A_Discovery = tmp_d[[1]]
+A_Replication = tmp_d[[2]]
+
+# split Schedule B dataset
+dset2use = subset(asd_df, asd_df$Schedule=="B")
+# tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed)
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+B_Discovery = tmp_d[[1]]
+B_Replication = tmp_d[[2]]
+
+# split Schedule C dataset
+dset2use = subset(asd_df, asd_df$Schedule=="C")
+# tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed)
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+C_Discovery = tmp_d[[1]]
+C_Replication = tmp_d[[2]]
+
+# split Schedule D dataset
+dset2use = subset(asd_df, asd_df$Schedule=="D")
+# tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed)
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+D_Discovery = tmp_d[[1]]
+D_Replication = tmp_d[[2]]
+
+
+df_Disc = rbind(A_Discovery, B_Discovery, C_Discovery, D_Discovery)
+df_Rep = rbind(A_Replication, B_Replication, C_Replication, D_Replication)
+
+a = table(df_Disc$Schedule, df_Disc$Centre); print(a)
+b = table(df_Rep$Schedule, df_Rep$Centre); print(b)
+print(a-b)
+print(sum(rowSums(abs(a-b))))
+
+
+
+data2write$dataset = NA
+mask  = is.element(data2write$subid,df_Disc$subid)
+data2write[mask,"dataset"] = "Discovery"
+mask  = is.element(data2write$subid,df_Rep$subid)
+data2write[mask,"dataset"] = "Replication"
+
+#data2write = subset(data2write, !data2write$site=="mannheim")
+
+asd_Disc = subset(data2write, data2write$dataset=="Discovery" & data2write$Diagnosis=="ASD")
+asd_Rep = subset(data2write, data2write$dataset=="Replication" & data2write$Diagnosis=="ASD")
+
+# find which seed gives best TD age-match -------------------------------------
+seeds = 1:1000
+pvals = data.frame(matrix(nrow = length(seeds), ncol = 2))
+for (i in 1:length(seeds)) {
+  res = findTDAgeMatch(data2write, seed_range = c(seeds[i],seeds[i]))
+  td_Disc_matched = res[[1]]
+  td_Rep_matched = res[[2]]
+  tres = t.test(td_Disc_matched$age, asd_Disc$age)
+  pvals[i,1] = tres$p.value
+  tres = t.test(td_Rep_matched$age, asd_Rep$age)
+  pvals[i,2] = tres$p.value
+  #print(i)
+}
+a = sort.int(pvals[,1], decreasing = TRUE, index.return = TRUE)
+b=pvals[a$ix,]
+
+#seed2use = 894
+#seed2use = 584
+# seed2use = 421
+seed2use = 929
+res = findTDAgeMatch(data2write, seed_range = c(seed2use,seed2use))
+td_Disc_matched = res[[1]]
+td_Rep_matched = res[[2]]
+
+mask = is.element(data2write$subid, td_Disc_matched$subid)
+data2write$dataset[mask] = "Discovery"
+
+mask = is.element(data2write$subid, td_Rep_matched$subid)
+data2write$dataset[mask] = "Replication"
+
+print(table(data2write$dataset, data2write$subgrp))
+
+#-----------------------------------------------------------------------------
+fname2save = file.path(rootpath, "asd_subgrp_data_rsfmri_ALL_DSM5_3grpSupervised.csv")
+write.csv(data2write,file = fname2save)
+
+# # low motion subjects
+# motThresh = 0.2
+# low_mot_data = data2write[data2write$meanFD<=motThresh,]
+# fname2save = file.path(rootpath, "asd_subgrp_data_rsfmri_lowmotion_meanFD_0.2.csv")
+# write.csv(low_mot_data,file = fname2save)
+# 
+# # medium motion subjects
+# motThresh = 0.5
+# med_mot_data = data2write[data2write$meanFD<=motThresh,]
+# fname2save = file.path(rootpath, "asd_subgrp_data_rsfmri_mediummotion_meanFD_0.5.csv")
+# write.csv(med_mot_data,file = fname2save)
+
+
+```
+
+<!-- ## Run clustering on split datasets -->
+
+<!-- ```{r} -->
+<!-- # cluster Discovery -->
+<!-- dS = 1 -->
+<!-- data2use = df_Disc[,5:8] -->
+<!-- fname2save = file.path(rootpath,sprintf("clustergram_ADIalgoTotals_Discovery_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- Discovery_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save, minClusterSize = 20) -->
+<!-- #Discovery_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save, mergeModules = TRUE, modMergeCutHeight = 0.01, minClusterSize = 20) -->
+<!-- table(Discovery_clustResults$dynamicColors) -->
+<!-- maxScores = c(45,21,18,18) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIalgoTotals_Discovery_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(Discovery_clustResults, fname2save = fname2save)#, transformPercentSeverity = maxScores) -->
+
+<!-- # cluster Replication -->
+<!-- dS = 1 -->
+<!-- data2use = df_Rep[,5:8] -->
+<!-- fname2save = file.path(rootpath,sprintf("clustergram_ADIalgoTotals_Replication_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- Replication_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save, minClusterSize = 20) -->
+<!-- #Replication_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save, mergeModules = TRUE, modMergeCutHeight = 0.01, minClusterSize = 25) -->
+<!-- table(Replication_clustResults$dynamicColors) -->
+<!-- maxScores = c(45,21,18,18) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIalgoTotals_Replication_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(Replication_clustResults, fname2save = fname2save)#, transformPercentSeverity = maxScores) -->
+
+
+<!-- # Switch colors on Discovery set -->
+<!-- oldColors = c("blue","brown","turquoise","yellow") -->
+<!-- newColors = c("blue","turquoise","red","green") -->
+<!-- Discovery_clustResults = relabelClusters(Discovery_clustResults, oldColors, newColors) -->
+<!-- table(Discovery_clustResults$dynamicColors) -->
+<!-- maxScores = c(45,21,18,18) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIalgoTotals_DiscoveryCOLORCHANGE_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(Discovery_clustResults, fname2save = fname2save, transformPercentSeverity = maxScores) -->
+
+
+<!-- # Switch colors on Replication set -->
+<!-- oldColors = c("blue","brown","turquoise","yellow") -->
+<!-- newColors = c("blue","green","turquoise","red") -->
+<!-- Replication_clustResults = relabelClusters(Replication_clustResults, oldColors, newColors) -->
+<!-- table(Replication_clustResults$dynamicColors) -->
+<!-- maxScores = c(45,21,18,18) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIalgoTotals_ReplicationCOLORCHANGE_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(Replication_clustResults, fname2save = fname2save, transformPercentSeverity = maxScores) -->
+
+
+
+
+
+<!-- # Run on subscale scores -->
+<!-- df2use = df[,c(bkgrd_vars, subscale_vars)] -->
+
+<!-- na_mask = rowSums(is.na(df2use[,5:(length(subscale_vars)-1)+5]))>0 -->
+<!-- asd_mask = df2use$Diagnosis=="ASD" -->
+<!-- asd_df = subset(df2use, asd_mask & !na_mask) -->
+
+
+<!-- # cluster datasets -->
+<!-- dS = 2 -->
+<!-- data2use = asd_df[,5:((length(subscale_vars)-1)+5)] -->
+<!-- fname2save = file.path(rootpath,sprintf("clustergram_ADIsubscaleTotals_ALL_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- All_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save) -->
+<!-- table(All_clustResults$dynamicColors) -->
+<!-- maxScores = c(9,12,9,15,12,6,12,9,6,6,3,3) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIsubscaleTotals_ALL_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(All_clustResults, fname2save = fname2save, transformPercentSeverity = maxScores) -->
+
+
+<!-- # Split datasets ------------------------------------------------------------- -->
+<!-- #rngSeed = 1 -->
+<!-- rngSeed = best_seeds[1] -->
+
+
+<!-- # split Schedule A dataset -->
+<!-- dset2use = subset(asd_df, asd_df$Schedule=="A") -->
+<!-- tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed) -->
+<!-- A_Discovery = tmp_d[[1]] -->
+<!-- A_Replication = tmp_d[[2]] -->
+
+<!-- # split Schedule B dataset -->
+<!-- dset2use = subset(asd_df, asd_df$Schedule=="B") -->
+<!-- tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed) -->
+<!-- B_Discovery = tmp_d[[1]] -->
+<!-- B_Replication = tmp_d[[2]] -->
+
+<!-- # split Schedule C dataset -->
+<!-- dset2use = subset(asd_df, asd_df$Schedule=="C") -->
+<!-- tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed) -->
+<!-- C_Discovery = tmp_d[[1]] -->
+<!-- C_Replication = tmp_d[[2]] -->
+
+<!-- # split Schedule D dataset -->
+<!-- dset2use = subset(asd_df, asd_df$Schedule=="D") -->
+<!-- tmp_d = SplitDatasets(dset2use, rngSeed = rngSeed) -->
+<!-- D_Discovery = tmp_d[[1]] -->
+<!-- D_Replication = tmp_d[[2]] -->
+
+<!-- df_Disc = rbind(A_Discovery, B_Discovery, C_Discovery, D_Discovery) -->
+<!-- df_Rep = rbind(A_Replication, B_Replication, C_Replication, D_Replication) -->
+
+<!-- table(df_Disc$Schedule, df_Disc$Centre) -->
+<!-- table(df_Rep$Schedule, df_Rep$Centre) -->
+
+<!-- # cluster datasets -->
+<!-- dS = 1 -->
+<!-- data2use = df_Disc[,5:((length(subscale_vars)-1)+5)] -->
+<!-- fname2save = file.path(rootpath,sprintf("clustergram_ADIsubscaleTotals_Discovery_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- Discovery_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save, minClusterSize = 20) -->
+<!-- table(Discovery_clustResults$dynamicColors) -->
+<!-- maxScores = c(9,12,9,15,12,6,12,9,6,6,3,3) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIsubscaleTotals_Discovery_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(Discovery_clustResults, fname2save = fname2save, transformPercentSeverity = maxScores) -->
+
+
+<!-- dS = 1 -->
+<!-- data2use = df_Rep[,5:((length(subscale_vars)-1)+5)] -->
+<!-- fname2save = file.path(rootpath,sprintf("clustergram_ADIsubscaleTotals_Replication_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- Replication_clustResults = ClusterData(data2use, deepSplit=dS, fname2save = fname2save, minClusterSize = 20) -->
+<!-- table(Replication_clustResults$dynamicColors) -->
+<!-- maxScores = c(9,12,9,15,12,6,12,9,6,6,3,3) -->
+<!-- fname2save = file.path(rootpath,sprintf("summaryPlot_ADIsubscaleTotals_Replication_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- makeSummaryPlot(Replication_clustResults, fname2save = fname2save, transformPercentSeverity = maxScores) -->
+<!-- ``` -->
