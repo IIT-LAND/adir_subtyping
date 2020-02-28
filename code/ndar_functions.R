@@ -18,12 +18,12 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 # # Items------------------------------------------------------------------------
 # # Make labels for each item, and also indicate the names for the current and
 # # ever/most abnormal variables
-# 
+#
 # # # Early Language Development
 # # adi_earlyLang_labels_items = c("Age of first single words (If ever used) - In months",
 # #                                "Age of first phrases (if ever used) - in months")
 # # adi_earlyLang_items = c("acqorlossoflang_aword","acqorlossoflang_aphrase")
-# 
+#
 # # SC A1....................................................................
 # adi_A1_labels_items = c("Social Verbalization/Chat",
 #                         "Reciprocal conversation",
@@ -39,7 +39,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 #                  "socdev_cshare",
 #                  "socdev_cocomf",
 #                  "socdev_cssmile")
-# 
+#
 # # SC A2....................................................................
 # adi_A2_labels_items = c("Pointing to express interest",
 #                         "Nodding",
@@ -53,7 +53,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 #                  "funccom_cinsges",
 #                  "socdev_crfacex",
 #                  "socdev_cinapfe")
-# 
+#
 # # SC A3....................................................................
 # adi_A3_labels_items = c("Inappropriate questions or statements",
 #                         "Inappropriate facial expressions",
@@ -67,7 +67,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 #                  "socdev_cresp",
 #                  "funccom_chat5",
 #                  "socdev_csocdis")
-# 
+#
 # # RRB B1....................................................................
 # adi_B1_labels_items = c("Stereotyped utterances and delayed echolalia",
 #                         "Pronominal reversal",
@@ -81,7 +81,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 #                  "intbehav_euseobj",
 #                  "intbehav_ehfman",
 #                  "intbehav_eothman")
-# 
+#
 # # RRB B2....................................................................
 # adi_B2_labels_items = c("Verbal rituals",
 #                         "Compulsions/rituals",
@@ -91,7 +91,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 #                  "intbehav_ecrit",
 #                  "intbehav_echange",
 #                  "intbehav_eresis")
-# 
+#
 # # RRB B3....................................................................
 # adi_B3_labels_items = c("Unusual preoccupations",
 #                         "Circumscribed interests",
@@ -99,7 +99,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 # adi_B3_items = c("intbehav_eunproc",
 #                  "intbehav_ecirint",
 #                  "intbehav_euatt")
-# 
+#
 # # RRB B4....................................................................
 # adi_B4_labels_items = c("Undue general sensitivity to noise",
 #                         "Abnormal idiosyncratic negative response to specific sensory stimuli",
@@ -107,8 +107,8 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 # adi_B4_items = c("intbehav_enoise",
 #                  "intbehav_eabinr",
 #                  "intbehav_eunsens")
-# 
-# 
+#
+#
 # # RRB B4....................................................................
 # adi_B4_labels_items = c("Undue general sensitivity to noise",
 #                         "Abnormal idiosyncratic negative response to specific sensory stimuli",
@@ -116,7 +116,7 @@ adi_subtotal_vars2use = c("dbaes_a1","dbaes_a2","dbaes_a3",
 # adi_B4_items = c("intbehav_enoise",
 #                  "intbehav_eabinr",
 #                  "intbehav_eunsens")
-# 
+#
 # # DSMIV verbal items (B2 (Verbal) + B3 (Verbal))............................
 # adi_DSMIVverbal_labels_items = c("Social Verbalization/Chat","Reciprocal conversation",
 #                                  "Stereotyped utterances and Delayed Echolalia",
@@ -186,7 +186,7 @@ adi_A3_labels_items = c("Inappropriate questions or statements",
                         "Responses to approaches of other children",
                         "Imaginative play with peers",
                         "Group play with peers",
-                        "Reciprocal conversation",
+                        "Friendships",
                         "Social disinhibition")
 adi_A3_items = c("funccom_cinappq",
                  "socdev_cinapfe",
@@ -196,7 +196,7 @@ adi_A3_items = c("funccom_cinappq",
                  "socdev_crespch",
                  "funccom_cpeerpl",
                  "socdev_cgrplay",
-                 "funccom_chat5",
+                 "socdev_cfriend",
                  "socdev_csocdis")
 
 # RRB B1....................................................................
@@ -260,56 +260,56 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 # #==============================================================================
 # # OLD #########################################################################
 # RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
-#   
+#
 #   D_subset = D[,ItemNames]
-#   
+#
 #   result = vector("numeric", length = nrow(D_subset))
-#   
+#
 #   # change any items that are 8 or 9 to NA
 #   mask = D_subset==7 | D_subset==8 | D_subset==9
 #   D_subset[mask] = NA
 #   # mask = ever_subset==7 | ever_subset==8 | ever_subset==9
 #   # ever_subset[mask] = NA
-#   
+#
 #   # change any items that are 3 to 2
 #   # mask = curr_subset==3
 #   # curr_subset[mask] = 2
 #   # mask = ever_subset==3
 #   # ever_subset[mask] = 2
-#   
+#
 #   for (i in 1:nrow(D_subset)) {
-#     
+#
 #     #Score A1--------------------------------------------------------------
 #     if (subscaleName=="A1") {
-#       
+#
 #       # social verbalization chat
 #       chat = D_subset[i,ItemNames[1]]
 #       chat = as.numeric(chat)
-#       
+#
 #       # reciprocal conversation
 #       recipconv = D_subset[i,ItemNames[2]]
 #       recipconv = as.numeric(recipconv)
-#       
+#
 #       # use of other's body to communicate
 #       useothbodcomm = D_subset[i,ItemNames[3]]
 #       useothbodcomm = as.numeric(useothbodcomm)
-#       
+#
 #       # showing or directing attention
 #       showing = D_subset[i,ItemNames[4]]
 #       showing = as.numeric(showing)
-#       
+#
 #       # seeking to share enjoyment with others
 #       shareenjoy = D_subset[i,ItemNames[5]]
 #       shareenjoy = as.numeric(shareenjoy)
-#       
+#
 #       # comfort
 #       comfort = D_subset[i,ItemNames[6]]
 #       comfort = as.numeric(comfort)
-#       
+#
 #       # social smiling
 #       socsmile = D_subset[i,ItemNames[7]]
 #       socsmile = as.numeric(socsmile)
-#       
+#
 #       # compute score
 #       if (is.na(chat) & is.na(recipconv) & is.na(useothbodcomm) & is.na(showing) & is.na(shareenjoy) & is.na(comfort) & is.na(socsmile)) {
 #         result[i] = NA
@@ -318,34 +318,34 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     } # if (subscaleName = "A1") {
 #     #Score A1--------------------------------------------------------------
-#     
+#
 #     #Score A2--------------------------------------------------------------
 #     if (subscaleName=="A2") {
-#       
+#
 #       # pointing
 #       pointing = D_subset[i,ItemNames[1]]
 #       pointing = as.numeric(pointing)
-#       
+#
 #       # nodding
 #       nodding = D_subset[i,ItemNames[2]]
 #       nodding = as.numeric(nodding)
-#       
+#
 #       # headshake
 #       headshake = D_subset[i,ItemNames[3]]
 #       headshake = as.numeric(headshake)
-#       
+#
 #       # conventional instrumental gestures
 #       coninstrgest = D_subset[i,ItemNames[4]]
 #       coninstrgest = as.numeric(coninstrgest)
-#       
+#
 #       # range of facial expressions to communicate
 #       rangefaceexpcomm = D_subset[i,ItemNames[5]]
 #       rangefaceexpcomm = as.numeric(rangefaceexpcomm)
-#       
+#
 #       # inappropriate facial expressions
 #       inappfaceexp = D_subset[i,ItemNames[6]]
 #       inappfaceexp = as.numeric(inappfaceexp)
-#       
+#
 #       # compute score
 #       if (is.na(pointing) & is.na(nodding) & is.na(headshake) & is.na(coninstrgest) & is.na(rangefaceexpcomm) & is.na(inappfaceexp)) {
 #         result[i] = NA
@@ -354,34 +354,34 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     } # if (subscaleName = "A2") {
 #     #Score A2--------------------------------------------------------------
-#     
+#
 #     #Score A3--------------------------------------------------------------
 #     if (subscaleName=="A3") {
-#       
+#
 #       # inappropriate questions or statements
 #       inappquest = D_subset[i,ItemNames[1]]
 #       inappquest = as.numeric(inappquest)
-#       
+#
 #       # inappropriate facial expressions
 #       inappfaceexp = D_subset[i,ItemNames[2]]
 #       inappfaceexp = as.numeric(inappfaceexp)
-#       
+#
 #       # offering to share
 #       share = D_subset[i,ItemNames[3]]
 #       share = as.numeric(share)
-#       
+#
 #       # appropriateness of social responses
 #       appsocresp = D_subset[i,ItemNames[4]]
 #       appsocresp = as.numeric(appsocresp)
-#       
+#
 #       # reciprocal conversation
 #       recipconv = D_subset[i,ItemNames[5]]
 #       recipconv = as.numeric(recipconv)
-#       
+#
 #       # social disinhibition
 #       socdisinhibition = D_subset[i,ItemNames[6]]
 #       socdisinhibition = as.numeric(socdisinhibition)
-#       
+#
 #       # compute score
 #       if (is.na(inappquest) & is.na(inappfaceexp) & is.na(share) & is.na(appsocresp) & is.na(recipconv) & is.na(socdisinhibition)) {
 #         result[i] = NA
@@ -390,35 +390,35 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     } # if (subscaleName = "A3") {
 #     #Score A3--------------------------------------------------------------
-#     
-#     
+#
+#
 #     #Score B1--------------------------------------------------------------
 #     if (subscaleName=="B1") {
-#       
+#
 #       # sterotyped utteranges and delayed echolalia
 #       stuttdelecho = D_subset[i,ItemNames[1]]
 #       stuttdelecho = as.numeric(stuttdelecho)
-#       
+#
 #       # pronominal reversal
 #       pronounrev = D_subset[i,ItemNames[2]]
 #       pronounrev = as.numeric(pronounrev)
-#       
+#
 #       # neologisms idiosyncractic language
 #       neologidiolang = D_subset[i,ItemNames[3]]
 #       neologidiolang = as.numeric(neologidiolang)
-#       
+#
 #       # repetitive use of objects
 #       repuseobj = D_subset[i,ItemNames[4]]
 #       repuseobj = as.numeric(repuseobj)
-#       
+#
 #       # hand and finger mannerisms
 #       handfinger = D_subset[i,ItemNames[5]]
 #       handfinger = as.numeric(handfinger)
-#       
+#
 #       # other complex mannerisms or sterotyped body movements
 #       othcompmann = D_subset[i,ItemNames[6]]
 #       othcompmann = as.numeric(othcompmann)
-#       
+#
 #       # compute score
 #       if (is.na(stuttdelecho) & is.na(pronounrev) & is.na(neologidiolang) & is.na(repuseobj) & is.na(handfinger) & is.na(othcompmann)) {
 #         result[i] = NA
@@ -427,26 +427,26 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     }# if (subscaleName = "B1") {
 #     #Score B1--------------------------------------------------------------
-#     
+#
 #     #Score B2--------------------------------------------------------------
 #     if (subscaleName=="B2") {
-#       
+#
 #       # verbal rituals
 #       verbrit = D_subset[i,ItemNames[1]]
 #       verbrit = as.numeric(verbrit)
-#       
+#
 #       # compulsions and rituals
 #       comprit = D_subset[i,ItemNames[2]]
 #       comprit = as.numeric(comprit)
-#       
+#
 #       # difficulties with minor change
 #       diffminchange = D_subset[i,ItemNames[3]]
 #       diffminchange = as.numeric(diffminchange)
-#       
+#
 #       # resistance to trivial change
 #       restrivchange = D_subset[i,ItemNames[4]]
 #       restrivchange = as.numeric(restrivchange)
-#       
+#
 #       # compute score
 #       if (is.na(verbrit) & is.na(comprit) & is.na(diffminchange) & is.na(restrivchange)) {
 #         result[i] = NA
@@ -455,22 +455,22 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     }# if (subscaleName = "B2") {
 #     #Score B2--------------------------------------------------------------
-#     
+#
 #     #Score B3--------------------------------------------------------------
 #     if (subscaleName=="B3") {
-#       
+#
 #       # unusual preoccupations
 #       unusualpreocc = D_subset[i,ItemNames[1]]
 #       unusualpreocc = as.numeric(unusualpreocc)
-#       
+#
 #       # circumscribed interests
 #       circumint = D_subset[i,ItemNames[2]]
 #       circumint = as.numeric(circumint)
-#       
+#
 #       # unusual attachment to objects
 #       unusualattachobj = D_subset[i,ItemNames[3]]
 #       unusualattachobj = as.numeric(unusualattachobj)
-#       
+#
 #       # compute score
 #       if (is.na(unusualpreocc) & is.na(circumint) & is.na(unusualattachobj)) {
 #         result[i] = NA
@@ -479,22 +479,22 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     } # if (subscaleName = "B3") {
 #     #Score B3--------------------------------------------------------------
-#     
+#
 #     #Score B4--------------------------------------------------------------
 #     if (subscaleName=="B4") {
-#       
+#
 #       # sensitivity to noise
 #       sensnoise = D_subset[i,ItemNames[1]]
 #       sensnoise = as.numeric(sensnoise)
-#       
+#
 #       # abnormal idiosyncratic negative response to specific stimuli
 #       abnormrespspecstim = D_subset[i,ItemNames[2]]
 #       abnormrespspecstim = as.numeric(abnormrespspecstim)
-#       
+#
 #       # unusual sensory interests
 #       unusualsensint = D_subset[i,ItemNames[3]]
 #       unusualsensint = as.numeric(unusualsensint)
-#       
+#
 #       # compute score
 #       if (is.na(sensnoise) & is.na(abnormrespspecstim) & is.na(unusualsensint)) {
 #         result[i] = NA
@@ -503,50 +503,50 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #       }#if
 #     }# if (subscaleName = "B4") {
 #     #Score B4--------------------------------------------------------------
-#     
-#     
+#
+#
 #     # DSM IV Verbal subscales (B2 + B3)------------------------------------
 #     #Score B2--------------------------------------------------------------
 #     if (subscaleName=="DSMIVverbal") {
-#       
-#       
+#
+#
 #       # social verbalization chat
 #       chat = D_subset[i,ItemNames[1]]
 #       chat = as.numeric(chat)
-#       
+#
 #       # reciprocal conversation
 #       recipconv = D_subset[i,ItemNames[2]]
 #       recipconv = as.numeric(recipconv)
-#       
-#       
+#
+#
 #       # sterotyped utteranges and delayed echolalia
 #       stuttdelecho = D_subset[i,ItemNames[3]]
 #       stuttdelecho = as.numeric(stuttdelecho)
-#       
+#
 #       # inappropriate questions or statements
 #       inappquest = D_subset[i,ItemNames[4]]
 #       inappquest = as.numeric(inappquest)
-#       
+#
 #       # pronominal reversal
 #       pronounrev = D_subset[i,ItemNames[5]]
 #       pronounrev = as.numeric(pronounrev)
-#       
+#
 #       # neologisms idiosyncractic language
 #       neologidiolang = D_subset[i,ItemNames[6]]
 #       neologidiolang = as.numeric(neologidiolang)
-#       
+#
 #       if (is.na(chat) & is.na(recipconv) & is.na(stuttdelecho) & is.na(inappquest) & is.na(pronounrev) & is.na(neologidiolang)) {
 #         result[i] = NA
 #       } else {
 #         result[i] = sum(chat, recipconv, stuttdelecho, inappquest, pronounrev, neologidiolang, na.rm = TRUE)
 #       }#if (is.na(chat) & is.na(conv)) {
-#       
+#
 #     } # if (subscaleName = "DSMIVverbal") {
 #     #DSMIVverbal--------------------------------------------------------------
-#     
-#     
+#
+#
 #   }#for (i in 1:nrow(curr_subset)) {
-#   
+#
 #   result
 # }# end function RescoreADI
 # #==============================================================================
@@ -563,248 +563,248 @@ adi_DSMIVverbal_items = c("funccom_cchat","funccom_chat5",
 #==============================================================================
 # NEW #########################################################################
 RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
-  
+
   D_subset = D[,ItemNames]
-  
+
   result = vector("numeric", length = nrow(D_subset))
-  
+
   # change any items that are 8 or 9 to NA
   # mask = D_subset==6 | D_subset==7 | D_subset==8 | D_subset==9
   mask = D_subset>3
   D_subset[mask] = 0
   # mask = ever_subset==7 | ever_subset==8 | ever_subset==9
   # ever_subset[mask] = NA
-  
+
   # change any items that are 3 to 2
   # mask = curr_subset==3
   # curr_subset[mask] = 2
   # mask = ever_subset==3
   # ever_subset[mask] = 2
-  
+
   for (i in 1:nrow(D_subset)) {
-    
+
     subject_age = D[i,"interview_age"]/12
     # print(sprintf("%s age is %f",D[i,"subjectkey"],subject_age))
-    
+
     if (is.na(subject_age)){
       result[i] = NA
     } else {
-      
+
       #Score A1--------------------------------------------------------------
       if (subscaleName=="A1") {
-        
+
         # social verbalization chat
         chat = D_subset[i,ItemNames[1]]
         chat = as.numeric(chat)
-        
+
         # reciprocal conversation
         recipconv = D_subset[i,ItemNames[2]]
         recipconv = as.numeric(recipconv)
-        
+
         # use of other's body to communicate
         useothbodcomm = D_subset[i,ItemNames[3]]
         useothbodcomm = as.numeric(useothbodcomm)
-        
+
         # imitative social play
         imitsocplay = D_subset[i,ItemNames[4]]
         imitsocplay = as.numeric(imitsocplay)
-        
+
         # showing or directing attention
         showing = D_subset[i,ItemNames[5]]
         showing = as.numeric(showing)
-        
+
         # seeking to share enjoyment with others
         shareenjoy = D_subset[i,ItemNames[6]]
         shareenjoy = as.numeric(shareenjoy)
-        
+
         # offering comfort
         comfort = D_subset[i,ItemNames[7]]
         comfort = as.numeric(comfort)
-  
+
         # attention to voice
         att2voice = D_subset[i,ItemNames[8]]
         att2voice = as.numeric(att2voice)
-        
+
         # social smiling
         socsmile = D_subset[i,ItemNames[9]]
         socsmile = as.numeric(socsmile)
-        
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
-          items2use = c(chat, recipconv, useothbodcomm, imitsocplay, 
+
+          items2use = c(chat, recipconv, useothbodcomm, imitsocplay,
                         showing, shareenjoy, comfort, att2voice, socsmile)
           possible_points = c(3,3,3,3,
                               3,3,3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
-          max_total_possible = sum(possible_points[!na_mask]) 
-          
+          max_total_possible = sum(possible_points[!na_mask])
+
         } else if (subject_age>=4 | subject_age<10){
-          
-          items2use = c(chat, recipconv, useothbodcomm, imitsocplay, 
+
+          items2use = c(chat, recipconv, useothbodcomm, imitsocplay,
                         showing, shareenjoy, comfort, socsmile)
           possible_points = c(3,3,3,3,
                               3,3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
-          max_total_possible = sum(possible_points[!na_mask]) 
-          
+          max_total_possible = sum(possible_points[!na_mask])
+
         } else if (subject_age>=10){
-          
-          items2use = c(chat, recipconv, useothbodcomm, 
+
+          items2use = c(chat, recipconv, useothbodcomm,
                         showing, shareenjoy, comfort, socsmile)
           possible_points = c(3,3,3,3,
                               3,3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
-          max_total_possible = sum(possible_points[!na_mask]) 
-          
+          max_total_possible = sum(possible_points[!na_mask])
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       } # if (subscaleName = "A1") {
       #Score A1--------------------------------------------------------------
-      
+
       #Score A2--------------------------------------------------------------
       if (subscaleName=="A2") {
-        
+
         # direct gaze
         directgaze = D_subset[i,ItemNames[1]]
         directgaze = as.numeric(directgaze)
-  
+
         # pointing
         pointing = D_subset[i,ItemNames[2]]
         pointing = as.numeric(pointing)
-        
+
         # nodding
         nodding = D_subset[i,ItemNames[3]]
         nodding = as.numeric(nodding)
-        
+
         # headshake
         headshake = D_subset[i,ItemNames[4]]
         headshake = as.numeric(headshake)
-        
+
         # conventional instrumental gestures
         coninstrgest = D_subset[i,ItemNames[5]]
         coninstrgest = as.numeric(coninstrgest)
-        
+
         # range of facial expressions to communicate
         rangefaceexpcomm = D_subset[i,ItemNames[6]]
         rangefaceexpcomm = as.numeric(rangefaceexpcomm)
-        
+
         # quality of social overtures
         qualsocover = D_subset[i,ItemNames[7]]
         qualsocover = as.numeric(qualsocover)
-        
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
-          items2use = c(directgaze, pointing, nodding, headshake, 
+
+          items2use = c(directgaze, pointing, nodding, headshake,
                         coninstrgest, rangefaceexpcomm, qualsocover)
           possible_points = c(3,3,2,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=4 | subject_age<10){
-          
-          items2use = c(pointing, nodding, headshake, 
+
+          items2use = c(pointing, nodding, headshake,
                         coninstrgest, rangefaceexpcomm, qualsocover)
           possible_points = c(3,2,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=10){
-          
-          items2use = c(pointing, nodding, headshake, 
+
+          items2use = c(pointing, nodding, headshake,
                         coninstrgest, rangefaceexpcomm, qualsocover)
           possible_points = c(3,2,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       } # if (subscaleName = "A2") {
       #Score A2--------------------------------------------------------------
-      
+
       #Score A3--------------------------------------------------------------
       if (subscaleName=="A3") {
-        
+
         # inappropriate questions or statements
         inappquest = D_subset[i,ItemNames[1]]
         inappquest = as.numeric(inappquest)
-        
+
         # inappropriate facial expressions
         inappfaceexp = D_subset[i,ItemNames[2]]
         inappfaceexp = as.numeric(inappfaceexp)
-        
+
         # offering to share
         share = D_subset[i,ItemNames[3]]
         share = as.numeric(share)
-        
+
         # appropriateness of social responses
         appsocresp = D_subset[i,ItemNames[4]]
         appsocresp = as.numeric(appsocresp)
-        
+
         # interest in children
         intchild = D_subset[i,ItemNames[5]]
         intchild = as.numeric(intchild)
-  
+
         # responses to approach of other children
         respappothchild = D_subset[i,ItemNames[6]]
         respappothchild = as.numeric(respappothchild)
-        
+
         # imaginative play with peers
         imagplaypeers = D_subset[i,ItemNames[7]]
         imagplaypeers = as.numeric(imagplaypeers)
-        
+
         # group play with peers
         grpplaypeers = D_subset[i,ItemNames[8]]
         grpplaypeers = as.numeric(grpplaypeers)
-        
+
         # reciprocal conversation
         recipconv = D_subset[i,ItemNames[9]]
         recipconv = as.numeric(recipconv)
-        
+
         # social disinhibition
         socdisinhibition = D_subset[i,ItemNames[10]]
         socdisinhibition = as.numeric(socdisinhibition)
-        
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
-          items2use = c(inappquest, inappfaceexp, share, 
+
+          items2use = c(inappquest, inappfaceexp, share,
                         appsocresp, intchild, respappothchild)
           possible_points = c(2,2,3,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=4 | subject_age<10){
-          
-          items2use = c(inappquest, inappfaceexp, share, 
-                        appsocresp, intchild, respappothchild, 
-                        imagplaypeers, grpplaypeers, recipconv, 
+
+          items2use = c(inappquest, inappfaceexp, share,
+                        appsocresp, intchild, respappothchild,
+                        imagplaypeers, grpplaypeers, recipconv,
                         socdisinhibition)
           possible_points = c(2,2,3,
                               3,3,3,
@@ -813,12 +813,12 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=10){
-          
-          items2use = c(inappquest, inappfaceexp, share, 
-                        appsocresp, 
-                        recipconv, 
+
+          items2use = c(inappquest, inappfaceexp, share,
+                        appsocresp,
+                        recipconv,
                         socdisinhibition)
           possible_points = c(2,2,3,
                               3,
@@ -827,299 +827,299 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       } # if (subscaleName = "A3") {
       #Score A3--------------------------------------------------------------
-      
-      
+
+
       #Score B1--------------------------------------------------------------
       if (subscaleName=="B1") {
-        
+
         # sterotyped utteranges and delayed echolalia
         stuttdelecho = D_subset[i,ItemNames[1]]
         stuttdelecho = as.numeric(stuttdelecho)
-        
+
         # pronominal reversal
         pronounrev = D_subset[i,ItemNames[2]]
         pronounrev = as.numeric(pronounrev)
-        
+
         # neologisms idiosyncractic language
         neologidiolang = D_subset[i,ItemNames[3]]
         neologidiolang = as.numeric(neologidiolang)
-        
+
         # repetitive use of objects
         repuseobj = D_subset[i,ItemNames[4]]
         repuseobj = as.numeric(repuseobj)
-        
+
         # hand and finger mannerisms
         handfinger = D_subset[i,ItemNames[5]]
         handfinger = as.numeric(handfinger)
-        
+
         # other complex mannerisms or sterotyped body movements
         othcompmann = D_subset[i,ItemNames[6]]
         othcompmann = as.numeric(othcompmann)
-  
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
-          items2use = c(stuttdelecho, pronounrev, neologidiolang, 
+
+          items2use = c(stuttdelecho, pronounrev, neologidiolang,
                         repuseobj, handfinger, othcompmann)
           possible_points = c(3,3,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=4 | subject_age<10){
-          
-          items2use = c(stuttdelecho, pronounrev, neologidiolang, 
+
+          items2use = c(stuttdelecho, pronounrev, neologidiolang,
                         repuseobj, handfinger, othcompmann)
           possible_points = c(3,3,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=10){
-          
-          items2use = c(stuttdelecho, pronounrev, neologidiolang, 
+
+          items2use = c(stuttdelecho, pronounrev, neologidiolang,
                         repuseobj, handfinger, othcompmann)
           possible_points = c(3,3,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       }# if (subscaleName = "B1") {
       #Score B1--------------------------------------------------------------
-      
+
       #Score B2--------------------------------------------------------------
       if (subscaleName=="B2") {
-        
+
         # verbal rituals
         verbrit = D_subset[i,ItemNames[1]]
         verbrit = as.numeric(verbrit)
-        
+
         # compulsions and rituals
         comprit = D_subset[i,ItemNames[2]]
         comprit = as.numeric(comprit)
-        
+
         # difficulties with minor change
         diffminchange = D_subset[i,ItemNames[3]]
         diffminchange = as.numeric(diffminchange)
-        
+
         # resistance to trivial change
         restrivchange = D_subset[i,ItemNames[4]]
         restrivchange = as.numeric(restrivchange)
-        
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
-          items2use = c(verbrit, comprit, diffminchange, 
+
+          items2use = c(verbrit, comprit, diffminchange,
                         restrivchange)
           possible_points = c(3,3,3,
                               3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=4 | subject_age<10){
-          
-          items2use = c(verbrit, comprit, diffminchange, 
+
+          items2use = c(verbrit, comprit, diffminchange,
                         restrivchange)
           possible_points = c(3,3,3,
                               3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=10){
-          
-          items2use = c(verbrit, comprit, diffminchange, 
+
+          items2use = c(verbrit, comprit, diffminchange,
                         restrivchange)
           possible_points = c(3,3,3,
                               3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       }# if (subscaleName = "B2") {
       #Score B2--------------------------------------------------------------
-      
+
       #Score B3--------------------------------------------------------------
       if (subscaleName=="B3") {
-        
+
         # unusual preoccupations
         unusualpreocc = D_subset[i,ItemNames[1]]
         unusualpreocc = as.numeric(unusualpreocc)
-        
+
         # circumscribed interests
         circumint = D_subset[i,ItemNames[2]]
         circumint = as.numeric(circumint)
-        
+
         # unusual attachment to objects
         unusualattachobj = D_subset[i,ItemNames[3]]
         unusualattachobj = as.numeric(unusualattachobj)
-        
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
+
           items2use = c(unusualpreocc, circumint, unusualattachobj)
           possible_points = c(3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=4 | subject_age<10){
-          
+
           items2use = c(unusualpreocc, circumint, unusualattachobj)
           possible_points = c(3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=10){
-          
+
           items2use = c(unusualpreocc, circumint, unusualattachobj)
           possible_points = c(3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       } # if (subscaleName = "B3") {
       #Score B3--------------------------------------------------------------
-      
+
       #Score B4--------------------------------------------------------------
       if (subscaleName=="B4") {
-        
+
         # sensitivity to noise
         sensnoise = D_subset[i,ItemNames[1]]
         sensnoise = as.numeric(sensnoise)
-        
+
         # abnormal idiosyncratic negative response to specific stimuli
         abnormrespspecstim = D_subset[i,ItemNames[2]]
         abnormrespspecstim = as.numeric(abnormrespspecstim)
-        
+
         # unusual sensory interests
         unusualsensint = D_subset[i,ItemNames[3]]
         unusualsensint = as.numeric(unusualsensint)
-        
+
         # grab relevant items for specific age bands
         if (subject_age<4){
-          
+
           items2use = c(sensnoise, abnormrespspecstim, unusualsensint)
           possible_points = c(3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=4 | subject_age<10){
-          
+
           items2use = c(sensnoise, abnormrespspecstim, unusualsensint)
           possible_points = c(3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } else if (subject_age>=10){
-          
+
           items2use = c(sensnoise, abnormrespspecstim, unusualsensint)
           possible_points = c(3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
-          
+
         } # if (subject_age<4){
-        
+
         # compute score
         if (na_count==length(items2use)){
           result[i] = NA
         } else{
           result[i] = sum(items2use, na.rm=TRUE)/max_total_possible
         } # if (na_count==length(items2use)){
-        
+
       }# if (subscaleName = "B4") {
       #Score B4--------------------------------------------------------------
-      
-      
+
+
       # DSM IV Verbal subscales (B2 + B3)------------------------------------
       #Score B2--------------------------------------------------------------
       if (subscaleName=="DSMIVverbal") {
-        
-        
+
+
         # social verbalization chat
         chat = D_subset[i,ItemNames[1]]
         chat = as.numeric(chat)
-        
+
         # reciprocal conversation
         recipconv = D_subset[i,ItemNames[2]]
         recipconv = as.numeric(recipconv)
-        
-        
+
+
         # sterotyped utteranges and delayed echolalia
         stuttdelecho = D_subset[i,ItemNames[3]]
         stuttdelecho = as.numeric(stuttdelecho)
-        
+
         # inappropriate questions or statements
         inappquest = D_subset[i,ItemNames[4]]
         inappquest = as.numeric(inappquest)
-        
+
         # pronominal reversal
         pronounrev = D_subset[i,ItemNames[5]]
         pronounrev = as.numeric(pronounrev)
-        
+
         # neologisms idiosyncractic language
         neologidiolang = D_subset[i,ItemNames[6]]
         neologidiolang = as.numeric(neologidiolang)
-        
+
         if (is.na(chat) & is.na(recipconv) & is.na(stuttdelecho) & is.na(inappquest) & is.na(pronounrev) & is.na(neologidiolang)) {
           result[i] = NA
         } else {
           result[i] = sum(chat, recipconv, stuttdelecho, inappquest, pronounrev, neologidiolang, na.rm = TRUE)
         }#if (is.na(chat) & is.na(conv)) {
-        
+
       } # if (subscaleName = "DSMIVverbal") {
       #DSMIVverbal--------------------------------------------------------------
     } # if (is.na(subject_age)){
-    
+
   }#for (i in 1:nrow(curr_subset)) {
-  
+
   result
 }# end function RescoreADI_DSM5
 #==============================================================================
@@ -1182,7 +1182,7 @@ SplitDatasets <- function(dset2use, rngSeed = 1) {
     } # if (is.even(i)) {
     Discovery = dset_tmp[fold1,]
     Replication = dset_tmp[fold2,]
-    
+
     result[[1]] = rbind(result[[1]],Discovery)
     result[[2]] = rbind(result[[2]],Replication)
   }#for (i in 1:length(dsetID)) {
@@ -1194,12 +1194,12 @@ SplitDatasets <- function(dset2use, rngSeed = 1) {
 SplitDatasetsBySex <- function(dset2use, rngSeed = 1) {
   set.seed(rngSeed)
   K = 2
-  
+
   #============================================================================
   # females
   female_data = subset(dset2use, dset2use$sex=="F")
   dset2use4real = female_data
-  
+
   dsetID = unique(dset2use4real$dataset_id)
   result = vector(mode = "list", length = K)
   result[[1]] = data.frame(matrix(nrow=0,ncol=0))
@@ -1218,18 +1218,18 @@ SplitDatasetsBySex <- function(dset2use, rngSeed = 1) {
     } # if (is.even(i)) {
     Discovery = dset_tmp[fold1,]
     Replication = dset_tmp[fold2,]
-    
+
     result[[1]] = rbind(result[[1]],Discovery)
     result[[2]] = rbind(result[[2]],Replication)
   }#for (i in 1:length(dsetID)) {
-  
+
   female_result = result
 
   #============================================================================
   # males
   male_data = subset(dset2use, dset2use$sex=="M")
   dset2use4real = male_data
-  
+
   dsetID = unique(dset2use4real$dataset_id)
   result = vector(mode = "list", length = K)
   result[[1]] = data.frame(matrix(nrow=0,ncol=0))
@@ -1248,18 +1248,18 @@ SplitDatasetsBySex <- function(dset2use, rngSeed = 1) {
     } # if (is.even(i)) {
     Discovery = dset_tmp[fold1,]
     Replication = dset_tmp[fold2,]
-    
+
     result[[1]] = rbind(result[[1]],Discovery)
     result[[2]] = rbind(result[[2]],Replication)
   }#for (i in 1:length(dsetID)) {
-  
+
   male_result = result
-  
+
   #============================================================================
   result = vector(mode = "list", length = K)
   result[[1]] = rbind(male_result[[1]],female_result[[1]])
   result[[2]] = rbind(male_result[[2]],female_result[[2]])
-  
+
   result
 } # end function SplitDatasets-------------------------------------------------
 
@@ -1271,9 +1271,9 @@ SplitDatasetsBySex <- function(dset2use, rngSeed = 1) {
 makeClustergram <- function(clusterDataResult, fname2save = "clustergram.pdf") {
   library(WGCNA)
   # library(tools)
-  
+
   cLim = c(min(clusterDataResult$adjMat),max(clusterDataResult$adjMat))
-  
+
   pdf(file = fname2save)
   TOMplot(dissim = as.matrix(clusterDataResult$adjMat),
           dendro = clusterDataResult$clustTree,
@@ -1287,7 +1287,7 @@ makeClustergram <- function(clusterDataResult, fname2save = "clustergram.pdf") {
 ClusterData <- function(dset, deepSplit = 1, minClusterSize = 1, cLim = c(0,1),
                         netType = "signed", linkMethod = "ward.D2", distMetric = "euclidean",
                         stand = FALSE, fname2save = FALSE) {
-  
+
   result = list(length = 11)
   # save input arguments
   result$dset = dset
@@ -1297,11 +1297,11 @@ ClusterData <- function(dset, deepSplit = 1, minClusterSize = 1, cLim = c(0,1),
   result$netType = netType
   result$linkMethod = linkMethod
   result$distMetric = distMetric
-  
+
   # load requisite libraries
   library(WGCNA)
   library(cluster)
-  
+
   # make distance matrix
   if (distMetric=="euclidean") {
     if (!is.logical(stand)) {
@@ -1323,27 +1323,27 @@ ClusterData <- function(dset, deepSplit = 1, minClusterSize = 1, cLim = c(0,1),
     mat2clust = adjMat
   }
   result$adjMat = adjMat
-  
+
   # run hierarchical clustering
   result$clustTree = hclust(as.dist(mat2clust), method = linkMethod)
   clustTree = result$clustTree
-  
+
   # dynamic hybrid tree cutting
   dynamicMods = cutreeDynamic(dendro = clustTree, distM = mat2clust,
                               deepSplit = deepSplit, pamRespectsDendro = FALSE, minClusterSize = minClusterSize)
   dynamicColors = labels2colors(dynamicMods)
-  
+
   # print table of module numbers and module colors
   table(dynamicMods)
   table(dynamicColors)
   result$dynamicMods = dynamicMods
   result$dynamicColors = dynamicColors
-  
+
   # make plot
   if (is.character(fname2save)) {
     makeClustergram(result, fname2save)
   }# if (makePlot)
-  
+
   result
 }# end function ClusterData----------------------------------------------------
 
@@ -1368,9 +1368,9 @@ makeSummaryPlot <- function(clusterDataResult, plotType = "line",
   library(ggplot2)
   library(reshape)
   library(Rmisc)
-  
+
   df2use = as.data.frame(clusterDataResult$dset)
-  
+
   # transform scores to percentage of max total one could score
   if (!is.logical(transformPercentSeverity)) {
     for (i in 1:length(transformPercentSeverity)) {
@@ -1380,7 +1380,7 @@ makeSummaryPlot <- function(clusterDataResult, plotType = "line",
   } else {
     yLabel = "Score"
   }#if (!transformPercentSeverity==FALSE) {
-  
+
   df2use$subgroup = clusterDataResult$dynamicColors
   dt = melt(df2use,id = "subgroup")
   dt$subgrpName = dt$subgroup
@@ -1391,18 +1391,18 @@ makeSummaryPlot <- function(clusterDataResult, plotType = "line",
   # dt$subgrpName[dt$subgroup=="yellow"] = "ASD4"
   p = ggplot(data = dt, aes(x = as.factor(variable),y = value,
                             colour = as.factor(subgrpName), fill = as.factor(subgrpName)))
-  
+
   if (plotType=="line") {
     #p = p + geom_point(stat='summary', fun.y=mean) +
     #	stat_summary(fun.y = mean, geom="line", aes(group = subgrpName)) +
     #	stat_summary(fun.data = "mean_cl_boot")
-    
+
     ds = summarySE(dt, measurevar = "value", groupvar = c("variable","subgrpName"))
     p = ggplot(ds, aes(x=as.factor(variable), y=value, colour=as.factor(subgrpName))) +
       geom_point(stat='summary', fun.y=mean) +
       stat_summary(fun.y = mean, geom="line", aes(group = subgrpName)) +
       geom_errorbar(aes(ymin=value-ci, ymax=value+ci),width=0)
-    
+
   } else if (plotType=="bar") {
     p = p + geom_bar(position = "dodge",stat = "summary", fun.y = "mean") +
       stat_summary(fun.data = "mean_cl_boot")
@@ -1414,13 +1414,13 @@ makeSummaryPlot <- function(clusterDataResult, plotType = "line",
   } else if (plotType=="boxplot") {
     p = p + geom_boxplot(fill=NA)
   } # if (plotType=="line")
-  
+
   p = p + scale_color_manual(values = uniqueColors)
   p = p + theme(axis.text.x = element_text(angle = 90, hjust = 1))
   p = p + ylim(yLim[1],yLim[2])
   p = p + ylab(yLabel)
   p
-  
+
   if (is.character(fname2save)) {
     if (is.null(plotDim)) {
       ggsave(file=fname2save)
@@ -1461,14 +1461,14 @@ plotClustersDendrogram <- function(fnames, fname2save = FALSE) {
     cLabels = c(cLabels, sprintf("dS=%d",i-1))
     cGroups[,i] = tmp$dynamicColors
   }
-  
+
   if (is.character(fname2save)) {
     pdf(file = fname2save)
   }#if (is.character(fname2save)) {
-  
+
   plotDendroAndColors(cTree,cGroups,cLabels,
                       dendroLabels = FALSE, hang = 0.03, addGuide=FALSE, guideHang = 0.05, main = " ")
-  
+
   if (is.character(fname2save)) {
     dev.off()
   }#if (is.character(fname2save)) {
