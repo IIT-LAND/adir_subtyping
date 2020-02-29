@@ -31,7 +31,7 @@ scoreADI_DSM5 <- function(df) {
       # score A1
       df2use = df_sub[,c(A1items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,3,
+      possible_points = c(3,2,3,
                           3,3,3,
                           3,3,3)
       na_mask = is.na(items2use)
@@ -51,7 +51,7 @@ scoreADI_DSM5 <- function(df) {
       # score A2
       df2use = df_sub[,c(A2items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,2,
+      possible_points = c(3,2,2,
                           2,3,3,
                           3)
       na_mask = is.na(items2use)
@@ -141,7 +141,7 @@ scoreADI_DSM5 <- function(df) {
       # score B4
       df2use = df_sub[,c(B4items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,3)
+      possible_points = c(3,3,2)
       na_mask = is.na(items2use)
       max_total_possible = sum(possible_points[!na_mask])
       sum_score = sum(items2use, na.rm = TRUE)
@@ -164,7 +164,7 @@ scoreADI_DSM5 <- function(df) {
       # score A1
       df2use = df_sub[,c(A1items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,3,
+      possible_points = c(3,2,3,
                           3,3,3,
                           3,3)
       na_mask = is.na(items2use)
@@ -184,7 +184,7 @@ scoreADI_DSM5 <- function(df) {
       # score A2
       df2use = df_sub[,c(A2items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,2,2,
+      possible_points = c(2,2,2,
                           3,3,3)
       na_mask = is.na(items2use)
       max_total_possible = sum(possible_points[!na_mask])
@@ -277,7 +277,7 @@ scoreADI_DSM5 <- function(df) {
       # score B4
       df2use = df_sub[,c(B4items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,3)
+      possible_points = c(3,3,2)
       na_mask = is.na(items2use)
       max_total_possible = sum(possible_points[!na_mask])
       sum_score = sum(items2use, na.rm = TRUE)
@@ -299,7 +299,7 @@ scoreADI_DSM5 <- function(df) {
       # score A1
       df2use = df_sub[,c(A1items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,3,
+      possible_points = c(3,2,3,
                           3,3,3,
                           3)
       na_mask = is.na(items2use)
@@ -319,7 +319,7 @@ scoreADI_DSM5 <- function(df) {
       # score A2
       df2use = df_sub[,c(A2items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,2,2,
+      possible_points = c(2,2,2,
                           3,3,3)
       na_mask = is.na(items2use)
       max_total_possible = sum(possible_points[!na_mask])
@@ -409,7 +409,7 @@ scoreADI_DSM5 <- function(df) {
       # score B4
       df2use = df_sub[,c(B4items)]
       items2use = rescoreNA(df2use)
-      possible_points = c(3,3,3)
+      possible_points = c(3,3,2)
       na_mask = is.na(items2use)
       max_total_possible = sum(possible_points[!na_mask])
       sum_score = sum(items2use, na.rm = TRUE)

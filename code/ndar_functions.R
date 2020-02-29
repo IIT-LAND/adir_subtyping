@@ -634,7 +634,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
 
           items2use = c(chat, recipconv, useothbodcomm, imitsocplay,
                         showing, shareenjoy, comfort, att2voice, socsmile)
-          possible_points = c(3,3,3,3,
+          possible_points = c(3,2,3,3,
                               3,3,3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
@@ -644,7 +644,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
 
           items2use = c(chat, recipconv, useothbodcomm, imitsocplay,
                         showing, shareenjoy, comfort, socsmile)
-          possible_points = c(3,3,3,3,
+          possible_points = c(3,2,3,3,
                               3,3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
@@ -654,7 +654,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
 
           items2use = c(chat, recipconv, useothbodcomm,
                         showing, shareenjoy, comfort, socsmile)
-          possible_points = c(3,3,3,3,
+          possible_points = c(3,2,3,3,
                               3,3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
@@ -708,7 +708,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
 
           items2use = c(directgaze, pointing, nodding, headshake,
                         coninstrgest, rangefaceexpcomm, qualsocover)
-          possible_points = c(3,3,2,2,
+          possible_points = c(3,2,2,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
@@ -718,7 +718,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
 
           items2use = c(pointing, nodding, headshake,
                         coninstrgest, rangefaceexpcomm, qualsocover)
-          possible_points = c(3,2,2,
+          possible_points = c(2,2,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
@@ -728,7 +728,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
 
           items2use = c(pointing, nodding, headshake,
                         coninstrgest, rangefaceexpcomm, qualsocover)
-          possible_points = c(3,2,2,
+          possible_points = c(2,2,2,
                               3,3,3)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
@@ -1044,7 +1044,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
         if (subject_age<4){
 
           items2use = c(sensnoise, abnormrespspecstim, unusualsensint)
-          possible_points = c(3,3,3)
+          possible_points = c(3,3,2)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
@@ -1052,7 +1052,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
         } else if (subject_age>=4 | subject_age<10){
 
           items2use = c(sensnoise, abnormrespspecstim, unusualsensint)
-          possible_points = c(3,3,3)
+          possible_points = c(3,3,2)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
@@ -1060,7 +1060,7 @@ RescoreADI_DSM5 <- function(D, ItemNames, subscaleName) {
         } else if (subject_age>=10){
 
           items2use = c(sensnoise, abnormrespspecstim, unusualsensint)
-          possible_points = c(3,3,3)
+          possible_points = c(3,3,2)
           na_mask = is.na(items2use)
           na_count = sum(na_mask)
           max_total_possible = sum(possible_points[!na_mask])
