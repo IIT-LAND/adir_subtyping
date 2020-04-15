@@ -32,3 +32,13 @@ The data directory houses tidy data generated for each step.
 * **MATLAB R2018b** or higher (https://www.mathworks.com/)
 
   + **FSLNets** (https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FSLNets) - Used for computation of partial correlations to estimate connectivity.
+
+## Code
+
+`_01_preproc*.Rmd` - initial processing of NDAR and LEAP ADI-R data (e.g., scoring)
+
+`_02_subtyping*.Rmd` - subtyping analyses
+
+`_03_connetivity*.Rmd` - connectivity analyses
+
+`_04_gex_decoding.Rmd` - gene expression decoding and enrichment analyses
