@@ -1,0 +1,230 @@
+---
+title: "Gene Expression Decoding"
+output: html_document
+---
+
+# Gene expression decoding analysis
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries("here","ggplot2","rjson","knitr","pheatmap")
+
+code_dir = here("code")
+result_dir = here("ns_gex_decode")
+asd_genelist_dir = here("asd_genelists")
+data_dir = here("data")
+
+source(file.path(code_dir,"ns_gene_decode.R"))
+source(file.path(code_dir,"genelistOverlap.R"))
+```
+
+Run the decoding in Neurosynth
+
+```{r, warning=FALSE, message=FALSE}
+RUN_DECODING = FALSE
+tissue_type = "cortex"
+fdr_thresh = 0.05
+
+result_dir = here("ns_gex_decode",tissue_type)
+
+if (RUN_DECODING){
+  # run gex decoding for each IC map of interest
+  
+  img2use = "IC07"
+  nv_id = 359784
+  fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+  ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+  img2use = "IC12"
+  nv_id = 370062
+  fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+  ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+  img2use = "IC13"
+  nv_id = 371665
+  fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+  ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+  img2use = "IC17"
+  nv_id = 319463
+  fname2save = file.path(result_dir,img2use,sprintf("%s_%s.csv",nv_id,tissue_type))
+  ns_gene_decode(image = nv_id, tissue = tissue_type, fname2save = fname2save, fdr_thresh = fdr_thresh)
+
+} # if (RUN_DECODING)
+```
+
+Run enrichment tests with gex decoded lists and ASD-relevant gene lists
+
+```{r, warning=FALSE, message=FALSE}
+load(file.path(data_dir,"genelists.Rda"))
+
+IC07genes = as.character(read.csv(file.path(result_dir,"IC07",sprintf("359784_%s_pos_t_fdr0.05.csv",tissue_type)))$symbol)
+IC12genes = as.character(read.csv(file.path(result_dir,"IC12",sprintf("370062_%s_pos_t_fdr0.05.csv",tissue_type)))$symbol)
+IC13genes = as.character(read.csv(file.path(result_dir,"IC13",sprintf("371665_%s_pos_t_fdr0.05.csv",tissue_type)))$symbol)
+IC17genes = as.character(read.csv(file.path(result_dir,"IC17",sprintf("319463_%s_pos_t_fdr0.05.csv",tissue_type)))$symbol)
+
+SCoverRRBgenes = unique(c(IC17genes,IC12genes))
+SCequalRRBgenes = unique(c(IC07genes,IC13genes))
+
+# Remove overlapping genes across the subtypes
+overlap_genes = SCoverRRBgenes[is.element(SCoverRRBgenes,SCequalRRBgenes)]
+SCoverRRBgenes = SCoverRRBgenes[!is.element(SCoverRRBgenes,overlap_genes)]
+SCequalRRBgenes = SCequalRRBgenes[!is.element(SCequalRRBgenes,overlap_genes)]
+  
+geneclasses = list(satterstrom_102,
+                   sfari_genes,
+                   gandal_asd_down,
+                   gandal_asd_up,
+                   asd_demods_down,
+                   asd_demods_up,
+                   excitatory_de_genes,
+                   inhibitory_de_genes,
+                   microglia_de_genes,
+                   oligodendrocyte_de_genes,
+                   astrocyte_de_genes,
+                   endothelial_de_genes,
+                   gandal_scz,
+                   gandal_bd)
+
+geneclassnames = c("ASD dnPTV",
+                   "ASD SFARI",
+                   "ASD DE Downreg",
+                   "ASD DE Upreg",
+                   "ASD CTX Downreg CoExpMods",
+                   "ASD CTX Upreg CoExpMods",
+                   "ASD Excitatory",
+                   "ASD Inhibitory",
+                   "ASD Microglia",
+                   "ASD Oligodendrocyte",
+                   "ASD Astrocyte",
+                   "ASD Endothelial",
+                   "SCZ DE",
+                   "BD DE")
+
+geneclassnames_abbrev = c("ASD_dnPTVs",
+                          "SFARI_ASD",
+                          "ASD_DE_Downreg_Gandal",
+                          "ASD_DE_Upreg_Gandal",
+                          "ASD_CTX_DownregMods",
+                          "ASD_CTX_UpregMods",
+                          "Excitatory_DE",
+                          "Inhibitory_DE",
+                          "Microglia_DE",
+                          "Oligodendrocyte_DE",
+                          "Astrocyte_DE",
+                          "Endothelial_DE",
+                          "SCZ_DE_Gandal",
+                          "BD_DE_Gandal")
+
+
+res_colnames =  c("IC12","IC17","IC07","IC13","SCequalRRB","SCoverRRB")
+
+ORmat = data.frame(matrix(nrow = length(geneclasses), 
+                          ncol = length(res_colnames)))
+logPmat = data.frame(matrix(nrow = length(geneclasses), 
+                            ncol = length(res_colnames)))
+Pmat = data.frame(matrix(nrow = length(geneclasses), 
+                         ncol = length(res_colnames)))
+FDRmat = data.frame(matrix(nrow = length(geneclasses), 
+                           ncol = length(res_colnames)))
+
+colnames(ORmat) = res_colnames
+colnames(logPmat) = res_colnames
+colnames(Pmat) = res_colnames
+colnames(FDRmat) = res_colnames
+rownames(ORmat) = geneclassnames
+rownames(logPmat) = geneclassnames
+rownames(Pmat) = geneclassnames
+rownames(FDRmat) = geneclassnames
+
+backgroundTotal = 20787
+
+for (i in 1:length(geneclasses)){
+  # intersect with background list
+  genes2 = geneclasses[[i]]
+  # mask = is.element(genes2, bglist)
+  genes2 = data.frame(genes2)
+
+  # IC07
+  overlap_res = genelistOverlap(data.frame(IC07genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,"IC07"] = overlap_res[[1]]$OR
+  logPmat[i,"IC07"] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,"IC07"] = overlap_res[[1]]$hypergeo_p
+  
+  # IC12
+  overlap_res = genelistOverlap(data.frame(IC12genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,"IC12"] = overlap_res[[1]]$OR
+  logPmat[i,"IC12"] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,"IC12"] = overlap_res[[1]]$hypergeo_p
+
+  # IC13
+  overlap_res = genelistOverlap(data.frame(IC13genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,"IC13"] = overlap_res[[1]]$OR
+  logPmat[i,"IC13"] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,"IC13"] = overlap_res[[1]]$hypergeo_p
+
+  # IC17
+  overlap_res = genelistOverlap(data.frame(IC17genes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,"IC17"] = overlap_res[[1]]$OR
+  logPmat[i,"IC17"] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,"IC17"] = overlap_res[[1]]$hypergeo_p
+  
+  # SCoverRRB
+  overlap_res = genelistOverlap(data.frame(SCoverRRBgenes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,"SCoverRRB"] = overlap_res[[1]]$OR
+  logPmat[i,"SCoverRRB"] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,"SCoverRRB"] = overlap_res[[1]]$hypergeo_p
+
+  write(overlap_res[[1]]$overlapping_genes,
+        file = file.path(result_dir,sprintf("overlap_SCoverRRB_%s.txt",geneclassnames_abbrev[i])))
+
+  # SCequalRRB
+  overlap_res = genelistOverlap(data.frame(SCequalRRBgenes),
+                                genes2,
+                                backgroundTotal,
+                                print_result = FALSE,
+                                header = FALSE)
+  ORmat[i,"SCequalRRB"] = overlap_res[[1]]$OR
+  logPmat[i,"SCequalRRB"] = -log10(overlap_res[[1]]$hypergeo_p)
+  Pmat[i,"SCequalRRB"] = overlap_res[[1]]$hypergeo_p
+
+  write(overlap_res[[1]]$overlapping_genes,
+      file = file.path(result_dir,sprintf("overlap_SCequalRRB_%s.txt",geneclassnames_abbrev[i])))
+} # for (i in 1:length(geneclasses)){
+
+# compute FDR
+for (i in 1:dim(Pmat)[2]){
+  FDRmat[,i] = p.adjust(Pmat[,i], method = "fdr")
+} # for (i in 1:dim(Pmat)[2]){
+
+kable(FDRmat)
+
+# make figure
+pheatmap(logPmat, display_numbers = round(ORmat,digits=2), 
+         number_color = "black", fontsize_number = 12,
+         show_rownames=TRUE,
+         labels_col = c("IC12","IC17","IC07","IC13","SC=RRB","SC>RRB"),
+         color = colorRampPalette(c('white','red'))(100),
+         cluster_rows = FALSE, cluster_cols = FALSE,
+         breaks= seq(0,3, length=100))
+
+```

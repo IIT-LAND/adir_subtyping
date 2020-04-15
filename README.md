@@ -24,7 +24,9 @@ The data directory houses tidy data generated for each step.
 
   + **R libraries**
 
-  **```c("here","ggplot2","rjson","readxl","reshape2","WGCNA","nlme")```**
+  **```c("here","ggplot2","rjson","readxl","reshape2","WGCNA","nlme",
+  "caret","e1071","pheatmap","NbClust","grid","patchwork","psych",
+  "matlabr","circlize","scico","knitr")```**
 
 
 * **MATLAB R2018b** or higher (https://www.mathworks.com/)

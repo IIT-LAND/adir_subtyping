@@ -1,0 +1,42 @@
+---
+title: "EU-AIMS LEAP subtyping preproc"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries and data
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries("readxl","reshape2","here","ggplot2")
+source(here("code","euaims_functions.R"))
+source(here("code","get_ggColorHue.R"))
+
+rootpath = here()
+datapath = here("data")
+rawpath = here("raw_data")
+plotpath = here("plots","euaims")
+fname = "ADI-R_V01_2017-10-27_13_04_04.xlsx"
+
+fname2open = file.path(rawpath, fname)
+df = read_excel(fname2open)
+
+df2 = read_excel("/Users/mlombardo/Dropbox/euaims/data/rsfmri_preproc/euaims_preproc.xlsx")
+df = merge(df2[,c("subid","age")],df,by.x="subid",by.y="ID")
+df$age_years = df$age/365 
+```
+
+Score ADI-R by DSM-5
+
+```{r, warning=FALSE, message=FALSE}
+# run scoring function
+df = scoreADI_DSM5(df)
+```
+
+Save out data
+
+```{r, warning=FALSE, message=FALSE}
+write.csv(df, file = file.path(datapath,"tidy_euaims.csv"))
+```

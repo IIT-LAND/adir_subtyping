@@ -1,0 +1,1094 @@
+---
+title: "NDAR EU-AIMS subtyping analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load libraries and data
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries("here","ggplot2","caret","e1071","pheatmap","reshape2","NbClust","grid","patchwork","readxl","patchwork","WGCNA","psych","nlme")
+source(here("code","ndar_functions.R"))
+source(here("code","euaims_functions.R"))
+source(here("code","get_ggColorHue.R"))
+
+options(stringsAsFactors = FALSE)
+
+# Z-score threshold to use for subtyping
+z_thresh = 0.7
+
+codepath = here("code")
+datapath = here("data")
+figpath = here("figures")
+resultpath = here("results","ndar")
+plotpath = here("plots","ndar")
+
+# read in data
+Dverbal_Discovery = read.csv(file.path(datapath,"tidy_verbal_disc.csv"))
+Dverbal_Replication = read.csv(file.path(datapath,"tidy_verbal_rep.csv"))
+```
+
+## Subtyping using Z-score of the difference between SC and RRB
+
+```{r, warning=FALSE, message=FALSE}
+make_subtype <- function(data2use, z_thresh, mean2use=NULL, sd2use=NULL){
+  # compute difference score
+  vars2use = c("dbaes_atotal","dbaes_btotal")
+  diff_score = data2use[,vars2use[1]] - data2use[,vars2use[2]]
+  
+  # compute mean and sd if necessary
+  if (is.null(mean2use)){
+    mean2use = mean(diff_score)
+  } # if (is.null(mean2use))
+  
+  if (is.null(sd2use)){
+    sd2use = sd(diff_score)
+  } # if (is.null(sd2use))
+  
+  # compute z-score
+  data2use$z_ds = (diff_score - mean2use)/sd2use
+  
+  # make subtype factor
+  data2use$z_ds_group = "SC_equal_RRB"
+  data2use$z_ds_group[data2use$z_ds>z_thresh] = "SC_over_RRB"
+  data2use$z_ds_group[data2use$z_ds<(z_thresh*-1)] = "RRB_over_SC"
+  data2use$z_ds_group = factor(data2use$z_ds_group)
+  return(data2use)
+  
+} # function make_subtype
+
+vars2use = c("dbaes_atotal","dbaes_btotal")
+
+# compute Discovery mean and sd
+ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
+mean2use = mean(ds_disc) 
+sd2use = sd(ds_disc)
+
+Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
+                                 z_thresh = z_thresh,
+                                 mean2use = mean2use,
+                                 sd2use = sd2use)
+
+# compute Replication mean and sd
+ds_rep = Dverbal_Replication[,vars2use[1]] - Dverbal_Replication[,vars2use[2]]
+# mean2use = mean(ds_rep) 
+# sd2use = sd(ds_rep)
+
+Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
+                                 z_thresh = z_thresh,
+                                 mean2use = mean2use,
+                                 sd2use = sd2use)
+```
+
+## Make scatterplots with difference score Z subtypes in different colors
+
+```{r, warning=FALSE, message=FALSE}
+maxScores = c(3,4)
+
+p_disc = ggplot(data = Dverbal_Discovery, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) + ggtitle("NDAR Discovery")
+p1_top_left = p_disc + guides(colour=FALSE)
+ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Disc_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p1_top_left)
+p_disc
+table(Dverbal_Discovery$z_ds_group)
+
+cor_res = cor.test(Dverbal_Discovery$dbaes_atotal, Dverbal_Discovery$dbaes_btotal)
+cor_res
+
+p_rep = ggplot(data = Dverbal_Replication, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) +  ggtitle("NDAR Replication")
+p2_bottom_left = p_rep + guides(colour=FALSE)
+ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Rep_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p2_bottom_left)
+p_rep
+table(Dverbal_Replication$z_ds_group)
+
+cor_res = cor.test(Dverbal_Replication$dbaes_atotal, Dverbal_Replication$dbaes_btotal)
+cor_res
+```
+
+<!-- ## Construct a supervised model and look for how accuracy changes across Z thresholds -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- # how many CV folds -->
+<!-- kfolds = 5 -->
+
+<!-- # create cross validation folds -->
+<!-- flds = createFolds(Dverbal_Discovery$dbaes_atotal, k = kfolds, list = TRUE, returnTrain = TRUE) -->
+
+<!-- # set for reproducibility -->
+<!-- set.seed(1)  -->
+<!-- rand_index = sample(dim(Dverbal_Discovery)[1]) -->
+
+<!-- # loop over cross validation folds -->
+<!-- z2use = seq(from=0.1, to=2, by=0.1) -->
+<!-- cv_acc = vector(length = length(z2use)) -->
+
+<!-- for (z in 1:length(z2use)){ -->
+<!--   z_curr = z2use[z] -->
+<!--   acc = vector(length = kfolds) -->
+
+<!--   for (i in 1:kfolds){ -->
+<!--     # get indices for train and test -->
+<!--     training_mask = rep(FALSE,dim(Dverbal_Discovery)[1]) -->
+<!--     training_mask[flds[[i]]] = TRUE -->
+<!--     test_mask = !training_mask -->
+<!--     train_idx = rand_index[training_mask] -->
+<!--     test_idx = rand_index[test_mask] -->
+
+<!--     # grab training and test data -->
+<!--     train_data = Dverbal_Discovery[train_idx,vars2use] -->
+<!--     test_data = Dverbal_Discovery[test_idx,vars2use] -->
+
+<!--     # make subtypes using z-scores computed from the mean and sd of the training set -->
+<!--     mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]]) -->
+<!--     sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]]) -->
+<!--     tmp_train = make_subtype(data2use = train_data, -->
+<!--                              z_thresh = z_curr, -->
+<!--                              mean2use = mean2use, -->
+<!--                              sd2use = sd2use) -->
+
+<!--     # mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]]) -->
+<!--     # sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]]) -->
+<!--     tmp_test = make_subtype(data2use = test_data, -->
+<!--                             z_thresh = z_curr, -->
+<!--                             mean2use = mean2use, -->
+<!--                             sd2use = sd2use) -->
+
+<!--     # run SVM -->
+<!--     mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group) -->
+<!--     pred_labels = predict(mod2use, tmp_test[,vars2use]) -->
+<!--     confmat = table(tmp_test$z_ds_group,pred_labels) -->
+<!--     acc[i] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels) -->
+
+<!--   } # for (i in 1:kfolds) -->
+
+<!--   cv_acc[z] = mean(acc) -->
+<!-- } # for (z in z2use) -->
+
+<!-- # plot mean cv accuracy across z -->
+<!-- df2plot = data.frame(Accuracy=cv_acc,Z=z2use) -->
+<!-- p = ggplot(data = df2plot, aes(x = Z, y = Accuracy)) + geom_point() + geom_smooth() -->
+<!-- ggsave(filename = file.path(plotpath, sprintf("final_SVM_CVacc_plot_z%s.pdf",as.character(z_thresh))), plot = p) -->
+<!-- p -->
+<!-- ``` -->
+
+## Run supervised model with Discovery as training and Replication as Test
+
+```{r, warning=FALSE, message=FALSE}
+# run validation
+# make subtypes using z-scores computed from the mean and sd of the training set
+train_data = Dverbal_Discovery
+test_data = Dverbal_Replication
+
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+tmp_train = make_subtype(data2use = train_data,
+                         z_thresh = z_thresh,
+                         mean2use = mean2use,
+                         sd2use = sd2use)
+
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+tmp_test = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = mean2use,
+                        sd2use = sd2use)
+# compute model
+mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+pred_labels = predict(mod2use, tmp_test[,vars2use])
+confmat = table(tmp_test$z_ds_group,pred_labels)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+# plot confusion matrix
+setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+pheatmap(confmat/rowSums(confmat)*100, display_numbers = TRUE, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = 15,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90)
+setHook("grid.newpage", NULL, "replace")
+grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=16))
+grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=16))
+
+# show accuracy
+true_accuracy = acc
+true_accuracy
+```
+
+
+
+## Permute subtype labels to examine how well supervised model performs
+
+```{r, warning=FALSE, message=FALSE}
+nperm = 10000
+# make subtypes using z-scores computed from the mean and sd of the training set
+train_data = Dverbal_Discovery
+test_data = Dverbal_Replication
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+tmp_train = make_subtype(data2use = train_data,
+                         z_thresh = z_thresh,
+                         mean2use = mean2use,
+                         sd2use = sd2use)
+
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+tmp_test = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = mean2use,
+                        sd2use = sd2use)
+
+acc = vector(length = nperm)
+for (iperm in 1:nperm){
+  # set seed for reproducibility
+  set.seed(iperm)
+  # compute model
+  permuted_labels = sample(tmp_train$z_ds_group)
+  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+  pred_labels = predict(mod2use, tmp_test[,vars2use])
+  confmat = table(tmp_test$z_ds_group,pred_labels)
+  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+} # for (iperm in 1:nperm)
+
+df2plot = data.frame(Accuracy = acc)
+p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+p
+
+# compute p-value
+pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+pval
+```
+
+
+## Plot difference score Z subtypes in Discovery set
+
+```{r, warning=FALSE, message=FALSE}
+maxScores = c(3,4)
+
+# Discovery - make plot with all individuals shown as lines
+df2use = Dverbal_Discovery[,c("subjectkey",adi_total_vars2use)]
+df2use$subgrp = factor(tmp_train$z_ds_group)
+df2use = data.frame(df2use)
+df2use$subjectkey = factor(df2use$subjectkey)
+df2use$SC = df2use$dbaes_atotal
+df2use$RRB = df2use$dbaes_btotal
+
+df4plot = melt(df2use,
+               id.vars = c("subjectkey","subgrp"), 
+               measure.vars = c("SC","RRB"))
+
+p = ggplot(data = df4plot, aes(x = variable, 
+                               y = value, 
+                               colour = subgrp, 
+                               group = subjectkey)) + facet_grid(. ~ subgrp)
+p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
+p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
+p3_middle_top = p + guides(colour=FALSE)
+ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Disc_jitterplot_z%s.pdf",as.character(z_thresh))), plot = p3_middle_top)
+p
+```
+
+## Plot difference score Z subtypes in Replication set
+
+```{r, warning=FALSE, message=FALSE}
+maxScores = c(3,4)
+
+# Replication - make plot with all individuals shown as lines
+df2use = Dverbal_Replication[,c("subjectkey",adi_total_vars2use)]
+df2use$subgrp = factor(tmp_test$z_ds_group)
+df2use = data.frame(df2use)
+df2use$subjectkey = factor(df2use$subjectkey)
+df2use$SC = df2use$dbaes_atotal
+df2use$RRB = df2use$dbaes_btotal
+
+df4plot = melt(df2use,
+               id.vars = c("subjectkey","subgrp"), 
+               measure.vars = c("SC","RRB"))
+
+p = ggplot(data = df4plot, aes(x = variable, 
+                               y = value, 
+                               colour = subgrp, 
+                               group = subjectkey)) + facet_grid(. ~ subgrp)
+p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
+p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
+p4_middle_bottom = p + guides(colour=FALSE)
+ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Rep_jitterplot_z%s.pdf",as.character(z_thresh))), plot = p4_middle_bottom)
+p
+```
+
+<!-- ## Subtype using hierarchical clustering and dynamic hybrid tree cut algorithm to find the subtypes -->
+
+<!-- NDAR Discovery -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- # deep split parameter -->
+<!-- dS = 0 -->
+<!-- maxScores = c(3,4) -->
+
+<!-- data2use = Dverbal_Discovery[,vars2use] -->
+
+<!-- # discReorderedItems = colnames(data2use) -->
+<!-- fname2save = file.path(plotpath, -->
+<!--                        sprintf("clustergram_ADIalgoTotals_verbalDiscovery_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- verbalDiscovery_clustResults = ClusterData(data2use, -->
+<!--                                      deepSplit=dS, -->
+<!--                                      fname2save = fname2save) -->
+
+<!-- oldColors = c("blue","brown","green","red","turquoise","yellow") -->
+<!-- newColors = c("5","2","6","4","3","1") -->
+
+<!-- verbalDiscovery_clustResults = relabelClusters(verbalDiscovery_clustResults, oldColors, newColors) -->
+<!-- makeClustergram(verbalDiscovery_clustResults, fname2save = fname2save) -->
+
+<!-- # make plot with all individuals shown as lines -->
+<!-- df2use = Dverbal_Discovery[,c("subjectkey",vars2use)] -->
+<!-- df2use$subgrp = factor(verbalDiscovery_clustResults$dynamicColors) -->
+<!-- df2use = data.frame(df2use) -->
+<!-- df2use$subjectkey = factor(df2use$subjectkey) -->
+<!-- # df2use$dbaes_atotal = df2use$dbaes_atotal/maxScores[1] -->
+<!-- # df2use$dbaes_btotal = df2use$dbaes_btotal/maxScores[2] -->
+<!-- #******************************************************* -->
+<!-- df2use$dbaes_atotal = df2use$dbaes_atotal -->
+<!-- df2use$dbaes_btotal = df2use$dbaes_btotal -->
+<!-- #******************************************************* -->
+<!-- df4plot = melt(df2use, -->
+<!--                id.vars = c("subjectkey","subgrp"), -->
+<!--                measure.vars = c("dbaes_atotal","dbaes_btotal")) -->
+
+<!-- ggcolors = get_ggColorHue(3) -->
+<!-- colors2use = c(ggcolors[1],ggcolors[1],ggcolors[1],ggcolors[2],ggcolors[3],ggcolors[3]) -->
+<!-- p = ggplot(data = df4plot, aes(x = variable, -->
+<!--                                y = value, -->
+<!--                                colour = subgrp, -->
+<!--                                group = subjectkey)) + facet_grid(. ~ subgrp) -->
+<!-- p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) + -->
+<!--   scale_colour_manual(values = colors2use) + ylim(0,1) -->
+<!-- p = p + ylab("Percent Severity") + xlab("ADI-R subscale") -->
+<!-- fname2save = file.path(plotpath, -->
+<!--                        sprintf("summaryPlot_IndividualSubs_ADIalgoTotals_verbalDiscovery_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- ggsave(filename = fname2save) -->
+<!-- p -->
+<!-- ``` -->
+
+
+<!-- NDAR Replication -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- # deep split parameter -->
+<!-- dS = 0 -->
+<!-- maxScores = c(3,4) -->
+
+<!-- data2use = Dverbal_Replication[,vars2use] -->
+
+<!-- # discReorderedItems = colnames(data2use) -->
+<!-- fname2save = file.path(plotpath, -->
+<!--                        sprintf("clustergram_ADIalgoTotals_verbalReplication_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- verbalReplication_clustResults = ClusterData(data2use, -->
+<!--                                              deepSplit=dS, -->
+<!--                                              fname2save = fname2save) -->
+
+<!-- oldColors = c("black","blue","brown","green","red","turquoise","yellow") -->
+<!-- newColors = c("1","3","4","5","2","7","6") -->
+
+<!-- verbalReplication_clustResults = relabelClusters(verbalReplication_clustResults, oldColors, newColors) -->
+<!-- makeClustergram(verbalReplication_clustResults, fname2save = fname2save) -->
+
+<!-- # make plot with all individuals shown as lines -->
+<!-- df2use = Dverbal_Replication[,c("subjectkey",vars2use)] -->
+<!-- df2use$subgrp = factor(verbalReplication_clustResults$dynamicColors) -->
+<!-- df2use = data.frame(df2use) -->
+<!-- df2use$subjectkey = factor(df2use$subjectkey) -->
+<!-- # df2use$dbaes_atotal = df2use$dbaes_atotal/maxScores[1] -->
+<!-- # df2use$dbaes_btotal = df2use$dbaes_btotal/maxScores[2] -->
+<!-- #******************************************************* -->
+<!-- df2use$dbaes_atotal = df2use$dbaes_atotal -->
+<!-- df2use$dbaes_btotal = df2use$dbaes_btotal -->
+<!-- #******************************************************* -->
+<!-- df4plot = melt(df2use, -->
+<!--                id.vars = c("subjectkey","subgrp"), -->
+<!--                measure.vars = c("dbaes_atotal","dbaes_btotal")) -->
+
+<!-- ggcolors = get_ggColorHue(3) -->
+<!-- colors2use = c(ggcolors[1],ggcolors[1],ggcolors[1],ggcolors[1],ggcolors[2],ggcolors[3],ggcolors[3]) -->
+<!-- p = ggplot(data = df4plot, aes(x = variable, -->
+<!--                                y = value, -->
+<!--                                colour = subgrp, -->
+<!--                                group = subjectkey)) + facet_grid(. ~ subgrp) -->
+<!-- p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) + -->
+<!--   scale_colour_manual(values = colors2use) + ylim(0,1) -->
+<!-- p = p + ylab("Percent Severity") + xlab("ADI-R subscale") -->
+<!-- fname2save = file.path(plotpath, -->
+<!--                        sprintf("summaryPlot_IndividualSubs_ADIalgoTotals_verbalReplication_euclidean_ward_deepSplit%d.pdf",dS)) -->
+<!-- ggsave(filename = fname2save) -->
+<!-- p -->
+<!-- ``` -->
+
+
+<!-- ## Subtype using hierarchical agglomerative clustering, looking for k=3 -->
+
+<!-- Will use SC, RRB and the difference score as features -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- # how many clusters do you want? -->
+<!-- nclusters = 3 -->
+
+<!-- # cluster with SC, RRB, and difference score -->
+<!-- ds = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]] -->
+<!-- # distance matrix -->
+<!-- distmat = dist(x = cbind(Dverbal_Discovery[,vars2use], ds), method="euclidean") -->
+<!-- # hierarchical clustering -->
+<!-- disc_tree = hclust(d=distmat, method="ward.D2") -->
+<!-- # cut the tree -->
+<!-- treecut_res = cutree(tree=disc_tree, k=nclusters) -->
+<!-- Dverbal_Discovery$hc_subgrp = treecut_res -->
+
+<!-- ds = Dverbal_Replication[,vars2use[1]] - Dverbal_Replication[,vars2use[2]] -->
+<!-- # distance matrix -->
+<!-- distmat = dist(x = cbind(Dverbal_Replication[,vars2use], ds), method="euclidean") -->
+<!-- # hierarchical clustering -->
+<!-- disc_tree = hclust(d=distmat, method="ward.D2") -->
+<!-- # cut the tree -->
+<!-- treecut_res = cutree(tree=disc_tree, k=nclusters) -->
+<!-- Dverbal_Replication$hc_subgrp = treecut_res -->
+<!-- ``` -->
+
+<!-- ## Plot Discovery dataset after using hierarchical agglomerative clustering -->
+
+<!-- Discovery set -->
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- maxScores = c(3,4) -->
+
+<!-- # Discovery - make plot with all individuals shown as lines -->
+<!-- df2use = Dverbal_Discovery[,c("subjectkey",adi_total_vars2use)] -->
+<!-- df2use$subgrp = factor(Dverbal_Discovery$hc_subgrp) -->
+<!-- df2use = data.frame(df2use) -->
+<!-- df2use$subjectkey = factor(df2use$subjectkey) -->
+<!-- # df2use$SC = df2use$dbaes_atotal/maxScores[1] -->
+<!-- # df2use$RRB = df2use$dbaes_btotal/maxScores[2] -->
+<!-- #******************************************** -->
+<!-- df2use$SC = df2use$dbaes_atotal -->
+<!-- df2use$RRB = df2use$dbaes_btotal -->
+<!-- #******************************************** -->
+
+<!-- df4plot = melt(df2use, -->
+<!--                id.vars = c("subjectkey","subgrp"), -->
+<!--                measure.vars = c("SC","RRB")) -->
+
+<!-- p = ggplot(data = df4plot, aes(x = variable, -->
+<!--                                y = value, -->
+<!--                                colour = subgrp, -->
+<!--                                group = subjectkey)) + facet_grid(. ~ subgrp) -->
+<!-- p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) -->
+<!-- p = p + ylab("Percent Severity") + xlab("ADI-R subscale") -->
+<!-- p -->
+
+<!-- # scatterplot -->
+<!-- p_disc = ggplot(data = Dverbal_Discovery, aes(x = dbaes_atotal/maxScores[1], y = dbaes_btotal/maxScores[2], colour = factor(hc_subgrp))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ggtitle("NDAR Discovery") -->
+<!-- p_disc -->
+<!-- table(Dverbal_Discovery$hc_subgrp) -->
+<!-- ``` -->
+
+<!-- ## Plot Replication dataset after using hierarchical agglomerative clustering -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- maxScores = c(3,4) -->
+
+<!-- # Replication - make plot with all individuals shown as lines -->
+<!-- df2use = Dverbal_Replication[,c("subjectkey",adi_total_vars2use)] -->
+<!-- df2use$subgrp = factor(Dverbal_Replication$hc_subgrp) -->
+<!-- df2use = data.frame(df2use) -->
+<!-- df2use$subjectkey = factor(df2use$subjectkey) -->
+<!-- # df2use$SC = df2use$dbaes_atotal/maxScores[1] -->
+<!-- # df2use$RRB = df2use$dbaes_btotal/maxScores[2] -->
+<!-- #******************************************** -->
+<!-- df2use$SC = df2use$dbaes_atotal -->
+<!-- df2use$RRB = df2use$dbaes_btotal -->
+<!-- #******************************************** -->
+
+<!-- df4plot = melt(df2use, -->
+<!--                id.vars = c("subjectkey","subgrp"), -->
+<!--                measure.vars = c("SC","RRB")) -->
+
+<!-- p = ggplot(data = df4plot, aes(x = variable, -->
+<!--                                y = value, -->
+<!--                                colour = subgrp, -->
+<!--                                group = subjectkey)) + facet_grid(. ~ subgrp) -->
+<!-- p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) -->
+<!-- p = p + ylab("Percent Severity") + xlab("ADI-R subscale") -->
+<!-- p -->
+
+<!-- # scatterplot -->
+<!-- p_rep = ggplot(data = Dverbal_Replication, aes(x = dbaes_atotal/maxScores[1], y = dbaes_btotal/maxScores[2], colour = factor(hc_subgrp))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ggtitle("NDAR Replication") -->
+<!-- p_rep -->
+<!-- table(Dverbal_Replication$hc_subgrp) -->
+<!-- ``` -->
+
+
+<!-- ## Subtype using hierarchical agglomerative clustering, but use NbClust to find optimal number of clusters -->
+
+<!-- Will use SC, RRB. NbClust won't work if I give it the difference score -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- nbc_disc_res = NbClust(data = Dverbal_Discovery[,vars2use], method = "ward.D2") -->
+<!-- nbc_rep_res = NbClust(data = Dverbal_Replication[,vars2use], method = "ward.D2") -->
+<!-- ``` -->
+
+<!-- ## Plot Discovery dataset after using hierarchical agglomerative clustering and NbClust -->
+
+<!-- Discovery set -->
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- maxScores = c(3,4) -->
+
+<!-- # Discovery - make plot with all individuals shown as lines -->
+<!-- df2use = Dverbal_Discovery[,c("subjectkey",adi_total_vars2use)] -->
+<!-- df2use$subgrp = factor(nbc_disc_res$Best.partition) -->
+<!-- df2use = data.frame(df2use) -->
+<!-- df2use$subjectkey = factor(df2use$subjectkey) -->
+<!-- # df2use$SC = df2use$dbaes_atotal/maxScores[1] -->
+<!-- # df2use$RRB = df2use$dbaes_btotal/maxScores[2] -->
+<!-- #******************************************** -->
+<!-- df2use$SC = df2use$dbaes_atotal -->
+<!-- df2use$RRB = df2use$dbaes_btotal -->
+<!-- #******************************************** -->
+
+<!-- df4plot = melt(df2use, -->
+<!--                id.vars = c("subjectkey","subgrp"), -->
+<!--                measure.vars = c("SC","RRB")) -->
+
+<!-- p = ggplot(data = df4plot, aes(x = variable, -->
+<!--                                y = value, -->
+<!--                                colour = subgrp, -->
+<!--                                group = subjectkey)) + facet_grid(. ~ subgrp) -->
+<!-- p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) -->
+<!-- p = p + ylab("Percent Severity") + xlab("ADI-R subscale") -->
+<!-- p -->
+
+<!-- # scatterplot -->
+<!-- Dverbal_Discovery$nbclust_subgrp = factor(nbc_disc_res$Best.partition) -->
+<!-- p_disc = ggplot(data = Dverbal_Discovery, aes(x = dbaes_atotal/maxScores[1], y = dbaes_btotal/maxScores[2], colour = factor(nbclust_subgrp))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ggtitle("NDAR Discovery") -->
+<!-- p_disc -->
+<!-- table(Dverbal_Discovery$nbclust_subgrp) -->
+<!-- ``` -->
+
+<!-- ## Plot Replication dataset after using hierarchical agglomerative clustering -->
+
+<!-- ```{r, warning=FALSE, message=FALSE} -->
+<!-- maxScores = c(3,4) -->
+
+<!-- # Replication - make plot with all individuals shown as lines -->
+<!-- df2use = Dverbal_Replication[,c("subjectkey",adi_total_vars2use)] -->
+<!-- df2use$subgrp = factor(nbc_rep_res$Best.partition) -->
+<!-- df2use = data.frame(df2use) -->
+<!-- df2use$subjectkey = factor(df2use$subjectkey) -->
+<!-- # df2use$SC = df2use$dbaes_atotal/maxScores[1] -->
+<!-- # df2use$RRB = df2use$dbaes_btotal/maxScores[2] -->
+<!-- #******************************************** -->
+<!-- df2use$SC = df2use$dbaes_atotal -->
+<!-- df2use$RRB = df2use$dbaes_btotal -->
+<!-- #******************************************** -->
+
+<!-- df4plot = melt(df2use, -->
+<!--                id.vars = c("subjectkey","subgrp"), -->
+<!--                measure.vars = c("SC","RRB")) -->
+
+<!-- p = ggplot(data = df4plot, aes(x = variable, -->
+<!--                                y = value, -->
+<!--                                colour = subgrp, -->
+<!--                                group = subjectkey)) + facet_grid(. ~ subgrp) -->
+<!-- p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) -->
+<!-- p = p + ylab("Percent Severity") + xlab("ADI-R subscale") -->
+<!-- p -->
+
+<!-- # scatterplot -->
+<!-- Dverbal_Replication$nbclust_subgrp = factor(nbc_rep_res$Best.partition) -->
+<!-- p_rep = ggplot(data = Dverbal_Replication, aes(x = dbaes_atotal/maxScores[1], y = dbaes_btotal/maxScores[2], colour = factor(nbclust_subgrp))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ggtitle("NDAR Replication") -->
+<!-- p_rep -->
+<!-- table(Dverbal_Replication$nbclust_subgrp) -->
+<!-- ``` -->
+
+
+## Apply NDAR subtypes to EU-AIMS LEAP data
+
+```{r, warning=FALSE, message=FALSE}
+# make SC and RRB percentages since EU-AIMS data is specified as percentages
+Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
+euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
+mask1 = euaims_data$Diagnosis=="ASD" 
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+euaims_data = subset(euaims_data, (mask1 & !mask2))
+
+
+Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
+Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
+                               euaims_data$A2_pct_severity + 
+                               euaims_data$A3_pct_severity)/3
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
+                               euaims_data$B2_pct_severity + 
+                               euaims_data$B3_pct_severity + 
+                               euaims_data$B4_pct_severity)/4
+
+train_data = Dverbal
+test_data = euaims_data
+
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]], na.rm=TRUE)
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]], na.rm=TRUE)
+c(mean2use, sd2use)
+
+tmp_train = make_subtype(data2use = train_data,
+                         z_thresh = z_thresh,
+                         mean2use = mean2use,
+                         sd2use = sd2use)
+
+tmp_test = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = mean2use,
+                        sd2use = sd2use)
+
+# compute model
+mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+pred_labels = predict(mod2use, tmp_test[,vars2use])
+confmat = table(tmp_test$z_ds_group,pred_labels)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+tmp_test$svm_pred_labels = pred_labels
+
+# plot confusion matrix
+setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+pheatmap(confmat/rowSums(confmat)*100, display_numbers = TRUE, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = 15,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90)
+setHook("grid.newpage", NULL, "replace")
+grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=16))
+grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=16))
+
+
+# scatterplot
+p1 = ggplot(data = tmp_train, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("NDAR ALL")
+p1
+
+p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL")
+p2
+
+p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+p5_bottom_right = p3 + guides(colour=FALSE)
+ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+p3
+
+# # write out EU-AIMS LEAP data with subgroups defined by NDAR All
+write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+```
+
+Make final plot
+```{r, warning=FALSE, message=FALSE}
+p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+p_final
+```
+
+Integrate subtypes with rest of EU-AIMS LEAP data
+
+```{r, warning=FALSE, message=FALSE}
+euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
+td_df = subset(euaims_data, euaims_data$Diagnosis=="TD",select=2:6)
+td_df$A_pct_severity = as.numeric(NA)
+td_df$B_pct_severity = as.numeric(NA)
+td_df$subgrp = "TD"
+
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+tmp_asd = tmp_test[,cols2use]
+colnames(tmp_asd)[6] = "A_pct_severity"
+colnames(tmp_asd)[7] = "B_pct_severity"
+colnames(tmp_asd)[8] = "subgrp"
+asd_df = tmp_asd
+
+all_data = rbind(td_df,asd_df)
+
+fname = "/Users/mlombardo/Dropbox/euaims/data/rsfmri_preproc/euaims_preproc.xlsx"
+pp_data = read_excel(fname)
+mask = pp_data$notes=="ok"
+pp_data = subset(pp_data, mask)
+
+asd_df = merge(pp_data[,c("subid","sex")],asd_df, by = "subid")
+td_df = merge(pp_data[,c("subid","sex")],td_df, by = "subid")
+
+all_data = rbind(td_df,asd_df)
+
+data2write = merge(pp_data, all_data, by = "subid")
+data2write$age = data2write$age.x
+data2write$sex = data2write$sex.y
+print(table(data2write$Schedule, data2write$subgrp))
+print(table(data2write$Centre, data2write$subgrp))
+print(table(data2write$sex, data2write$subgrp))
+
+#DSM-5 - find best split that balances participants across sites
+a = findBestSplit(asd_df, seed_range = c(172342)) #,300001:500000))
+best_seeds = a$seed[!is.na(a$discrepancy) & a$discrepancy==min(a$discrepancy, na.rm = TRUE)]
+print(best_seeds)
+
+# Split datasets -------------------------------------------------------------
+rngSeed = best_seeds[1]
+
+# split Schedule A dataset
+dset2use = subset(asd_df, asd_df$Schedule=="A")
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+A_Discovery = tmp_d[[2]]
+A_Replication = tmp_d[[1]]
+
+# split Schedule B dataset
+dset2use = subset(asd_df, asd_df$Schedule=="B")
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+B_Discovery = tmp_d[[2]]
+B_Replication = tmp_d[[1]]
+
+# split Schedule C dataset
+dset2use = subset(asd_df, asd_df$Schedule=="C")
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+C_Discovery = tmp_d[[2]]
+C_Replication = tmp_d[[1]]
+
+# split Schedule D dataset
+dset2use = subset(asd_df, asd_df$Schedule=="D")
+tmp_d = SplitDatasetsBySex(dset2use, rngSeed = rngSeed)
+D_Discovery = tmp_d[[2]]
+D_Replication = tmp_d[[1]]
+
+df_Disc = rbind(A_Discovery, B_Discovery, C_Discovery, D_Discovery)
+df_Rep = rbind(A_Replication, B_Replication, C_Replication, D_Replication)
+
+a = table(df_Disc$Schedule, df_Disc$Centre); print(a)
+b = table(df_Rep$Schedule, df_Rep$Centre); print(b)
+print(a-b)
+print(sum(rowSums(abs(a-b))))
+
+data2write$dataset = NA
+mask  = is.element(data2write$subid,df_Disc$subid)
+data2write[mask,"dataset"] = "Discovery"
+mask  = is.element(data2write$subid,df_Rep$subid)
+data2write[mask,"dataset"] = "Replication"
+
+asd_Disc = subset(data2write, data2write$dataset=="Discovery" & data2write$Diagnosis=="ASD")
+asd_Rep = subset(data2write, data2write$dataset=="Replication" & data2write$Diagnosis=="ASD")
+
+# find which seed gives best TD age-match -------------------------------------
+seeds = 1:1000
+pvals = data.frame(matrix(nrow = length(seeds), ncol = 2))
+for (i in 1:length(seeds)) {
+  res = findTDAgeMatch(data2write, seed_range = c(seeds[i],seeds[i]))
+  td_Disc_matched = res[[2]]
+  td_Rep_matched = res[[1]]
+  tres = t.test(td_Disc_matched$age, asd_Disc$age)
+  pvals[i,1] = tres$p.value
+  tres = t.test(td_Rep_matched$age, asd_Rep$age)
+  pvals[i,2] = tres$p.value
+  #print(i)
+}
+a = sort.int(pvals[,1], decreasing = TRUE, index.return = TRUE)
+b=pvals[a$ix,]
+
+seed2use = 929
+res = findTDAgeMatch(data2write, seed_range = c(seed2use,seed2use))
+td_Disc_matched = res[[2]]
+td_Rep_matched = res[[1]]
+
+mask = is.element(data2write$subid, td_Disc_matched$subid)
+data2write$dataset[mask] = "Discovery"
+
+mask = is.element(data2write$subid, td_Rep_matched$subid)
+data2write$dataset[mask] = "Replication"
+
+print(table(data2write$dataset, data2write$subgrp))
+
+fname2save = here(sprintf("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+write.csv(data2write,file = fname2save)
+```
+
+Plot mean FD and hypothesis test
+
+```{r, warning=FALSE, message=FALSE}
+df2use = subset(data2write, data2write$subgrp!="RRB_over_SC")
+
+p = ggplot(data = df2use, aes(x = subgrp, y =meanFD, colour = subgrp)) + facet_wrap(. ~ dataset)
+p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) + guides(colour = FALSE)
+p = p + xlab("Group") + ylab("Mean FD")
+p
+
+# Hypothesis test
+df2use = data2write
+y_var = "meanFD"
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df2use, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+
+
+# Discovery
+df4mod = subset(df2use,df2use$dataset=="Discovery" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Replication
+df4mod = subset(df2use,df2use$dataset=="Replication" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+```
+
+Plot ADOS scores in the subtypes and also run a hypothesis test
+
+```{r, warning=FALSE, message=FALSE}
+df2use = subset(data2write, data2write$subgrp!="TD")
+df2use$ados_2_SA_CSS[df2use$ados_2_SA_CSS==999] = NA
+df2use$ados_2_RRB_CSS[df2use$ados_2_RRB_CSS==999] = NA
+
+df4plot = melt(df2use,
+               id.vars = c("subid","subgrp"), 
+               measure.vars = c("ados_2_SA_CSS","ados_2_RRB_CSS"))
+df4plot$variable = as.character(df4plot$variable)
+df4plot$variable[df4plot$variable=="ados_2_SA_CSS"] = "SA"
+df4plot$variable[df4plot$variable=="ados_2_RRB_CSS"] = "RRB"
+df4plot$variable = factor(df4plot$variable)
+
+p = ggplot(data = df4plot, aes(x = variable, 
+                               y = value, 
+                               colour = subgrp, 
+                               group = subid)) + facet_grid(. ~ subgrp)
+p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE)
+p = p + ylab("ADOS CSS") + xlab("ADOS Subscale")
+ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_ADOS_jitterplot_z%s.pdf",as.character(z_thresh))))
+p
+
+
+# hypothsis test on ADOS SA CSS
+y_var = "ados_2_SA_CSS"
+df2use = subset(data2write, !is.element(data2write$subgrp,c("TD")))
+
+# Hypothesis test
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df2use, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# hypothsis test on ADOS RRB CSS
+y_var = "ados_2_RRB_CSS"
+df2use = subset(data2write, !is.element(data2write$subgrp,c("TD")))
+
+# Hypothesis test
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df2use, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+```
+
+Descriptive stats
+
+```{r, warning=FALSE, message=FALSE}
+df2use = data2write[,c("subid","Diagnosis","dataset","Centre","meanFD","age","sex","subgrp","viq_all","piq_all","fsiq4_all","ados_2_SA_CSS","ados_2_RRB_CSS","SRS_tscore","SRS_tscore_self")]
+mask = df2use==999
+df2use[mask] = NA
+df2use$age = df2use$age/365
+
+cols2use = c("dataset","subgrp","age","meanFD","viq_all","piq_all","fsiq4_all","ados_2_SA_CSS","ados_2_RRB_CSS","SRS_tscore","SRS_tscore_self")
+res=describeBy(x = df2use[,cols2use], group = c("subgrp"))
+res
+```
+
+Model age differences
+
+```{r, warning=FALSE, message=FALSE}
+y_var = "age"
+
+# df4mod = subset(df2use,df2use$subgrp!="RRBoverSC")
+df4mod = df2use
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+
+# Discovery
+df4mod = subset(df2use,df2use$dataset=="Discovery" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Replication
+df4mod = subset(df2use,df2use$dataset=="Replication" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+```
+
+
+Model VIQ differences
+
+```{r, warning=FALSE, message=FALSE}
+y_var = "viq_all"
+
+# df4mod = subset(df2use,df2use$subgrp!="RRBoverSC")
+df4mod = df2use
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Discovery
+df4mod = subset(df2use,df2use$dataset=="Discovery" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Replication
+df4mod = subset(df2use,df2use$dataset=="Replication" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+```
+
+Model PIQ differences
+
+```{r, warning=FALSE, message=FALSE}
+y_var = "piq_all"
+
+# df4mod = subset(df2use,df2use$subgrp!="RRBoverSC")
+df4mod = df2use
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Discovery
+df4mod = subset(df2use,df2use$dataset=="Discovery" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Replication
+df4mod = subset(df2use,df2use$dataset=="Replication" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+```
+
+Model FIQ differences
+
+```{r, warning=FALSE, message=FALSE}
+y_var = "fsiq4_all"
+
+# df4mod = subset(df2use,df2use$subgrp!="RRBoverSC")
+df4mod = df2use
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Discovery
+df4mod = subset(df2use,df2use$dataset=="Discovery" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+# Replication
+df4mod = subset(df2use,df2use$dataset=="Replication" & df2use$subgrp!="RRBoverSC")
+# construct linear model
+# mixed-effect model: site as random factor, all other covariates as fixed factors
+fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
+rx_form = as.formula(sprintf("~ 1|%s","Centre"))
+mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
+
+# run ANOVA
+res = anova(mod2use)
+res
+
+```
+
