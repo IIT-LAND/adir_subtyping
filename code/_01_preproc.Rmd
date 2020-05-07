@@ -1,0 +1,586 @@
+---
+title: "NDAR subtyping preproc"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# NDAR
+
+Load libraries and data
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries("readxl","reshape2","here","WGCNA","ggplot2")
+source(here("code","ndar_functions.R"))
+source(here("code","get_ggColorHue.R"))
+
+options(stringsAsFactors = FALSE)
+
+codepath = here("code")
+datapath = here("data")
+figpath = here("figures")
+resultpath = here("results","ndar")
+plotpath = here("plots","ndar")
+ndardatapath = "/Users/mlombardo/Dropbox/NDARdata/ADI/data/13.12.2019"
+
+# read in the dataset
+fname = file.path(ndardatapath,"adi_200304.csv")
+D = read.csv(fname)
+
+sub_table = read.csv(file.path(ndardatapath,"ndar_subject01.csv"))
+
+D$phenotype = NA
+for (subid in D$subjectkey){
+  # print(subid)
+  if (length(sub_table[sub_table$subjectkey==subid,"phenotype"])==0){
+    D$phenotype[D$subjectkey==subid] = NA
+  } else if (length(sub_table[sub_table$subjectkey==subid,"phenotype"])==1){
+    D$phenotype[D$subjectkey==subid] = unique(sub_table[sub_table$subjectkey==subid,"phenotype"])[1]
+  } else if (length(sub_table[sub_table$subjectkey==subid,"phenotype"])>1){
+    D$phenotype[D$subjectkey==subid] = unique(sub_table[sub_table$subjectkey==subid,"phenotype"])[1]
+  } # if
+} # for
+
+asd_codes = c("ASD",
+              "Autism",
+              "PDD-NOS",
+              "Autistic",
+              "PDDNOS",
+              "Autism Spectrum",
+              "Autism Spectrum Disorder",
+              "PDD",
+              "abcct-main.10.asd",
+              "autism",
+              "autism spectrum",
+              "Asperger's",
+              "abcct-main.11.asd",
+              "Calculated using ADOS vars [ADOS_module ADOS_SARRB ADOS_Olang] and Mullen vars [MSLelTscore MSLvrTscore MSLrlTscore MSLfmTscore]",
+              "LFA",
+              "Autism Spectrum Disorder (ASD)",
+              "PDDNOS / Autism Spectrum",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 23",
+              "Autsim",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 22",
+              "ADOS diagnosis of Autism Spectrum; Overall Total ADOS score of 9",
+              "ADOS diagnosis of ASD level 2; Overall Total ADOS score of 14",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 16",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 20",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 15",
+              "ADOS diagnosis of mild ASD; Overall Total ADOS score of 10",
+              "ADOS diagnosis of mild ASD; Overall Total ADOS score of 9",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 21",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 18",
+              "ADOS diagnosis of mod/severe ASD; Overall Total ASD score of 16",
+              "Autism Diagnosis",
+              "ADOS diagnosis of ASD level 2 with moderate ID; Overall Total ADOS score of 15",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 14",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 19",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 17",
+              "ADOS diagnosis of ASD level 2 with mild ID; Overall Total ADOS score of 17",
+              "ADOS diagnosis of Autism Spectrum; Overall Total ADOS score of 12",
+              "ADOS diagnosis of ASD with language impairments; Overall Total ADOS score of14",
+              "ADOS diagnosis of Autism Spectrum; Overall Total ADOS score of 13",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 22",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 8",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 21",
+              "ADOS diagnosis of autism: Overall Total ADOS score of 24",
+              "ASD and ADHD-HI and Depression NOS",
+              "Autism and Generalized Anxiety",
+              "Autism and ADHD-Combined",
+              "Autism and ADHD-HI and specific phobia-animal(insects)",
+              "PDD NOS",
+              "Asperger",
+              "Autism and specific phobia of dogs",
+              "Autism and ADHD-HI",
+              "Autism and ADHD-Combined and Generalized Anxiety and persistent tic disorder (motor)",
+              "Autism and unspecified depressive disorder",
+              "Autism and ADHD-HI and Generalized Anxiety",
+              "Autism and ADHD-I and specific phobia butterflies and dogs",
+              "Autism and comorbid depression NOS",
+              "Autism and  specific phobias (snakes; planes); encopresis; persistent motor or vocal tic disorder with vocal tics only",
+              "Autism and ADHD-Combined and persistent motor or vocal tic disorder (vocal tics only)",
+              "ASD Group",
+              "Idiopathic Autism Spectrum Disorder",
+              "Autism Spectrum Affected",
+              "HFA,Autism",
+              "ASD_ATA",
+              "idiopathic autism spectrum disorder",
+              "Auditory ASD, 7357",
+              "Auditory ASD, 7354",
+              "Auditory ASD, 7309",
+              "Auditory ASD, 7255",
+              "Auditory ASD, 7310",
+              "AutismSpectrumDisorder",
+              "ASD and ADHD-I",
+              "ASD and GAD",
+              "ASD and ADHD-C and ODD",
+              "ASD and ADHD-C",
+              "ASD and OCD and specific phobia of dogs",
+              "ASD and ADHD-nos",
+              "ASD and ADHD-C and specific phobia of cacti",
+              "pdd-nos",
+              "Autism Spectrum",
+              "ASD",
+              "autism spectrum",
+              "Autism",
+              "ASD/+LI",
+              "PDD-NOS",
+              "autism",
+              "LFA",
+              "HFA",
+              "QA: HFA-LFA",
+              "QA: LFA-HFA",
+              "Autism;PDD-NOS;",
+              "Autism;",
+              "Anx Dis;  Autism; ADHD;  OCD;",
+              "Asp Synd;Depression; ADHD; OCD;",
+              "Anx Dis;Asp Synd;",
+              "Asp Synd;",
+              "Anx Dis;Asp Synd; Depression; PTSD; Bipolar;",
+              "Anx Dis; Asp Synd;",
+              "Anx Dis;Asp Synd; Depression;",
+              "Anx Dis;Asp Synd; ADHD;",
+              "Asp Synd;Depression;",
+              "LD; PDD-NOS;",
+              "Anx Dis;  Depression; Autism;",
+              "Anx Dis;Asp Synd; Depression; ADHD; PTSD;",
+              "Anx Dis;  Asp Synd; Depression; ADHD; LD; OCD;",
+              "Anx Dis;Asp Synd; Depression; Autism; LD;OCD;",
+              "Anx Dis;Asp Synd; Depression; Autism; ADHD;",
+              "Autism Spectrum Disorder",
+              "AUT",
+              "299,315.5,315.32,784.59,784.43",
+              "299,300,318.2,319,345.9",
+              "299,318.2,315.32",
+              "299,300,319,345.90",
+              "299,315.50",
+              "299,317,345.90",
+              "ASD, PDDNOS",
+              "PDDNOS, ADHD",
+              "ASD, ADHD",
+              "ASD, ADHD, visual impairment, dyscalcula",
+              "PDDNOS, ADHD, processing disorder, speech/language",
+              "ASD, Non-verbal learning disorder, ADHD",
+              "PDDNOS",
+              "ASD, anxiety",
+              "Aspergers, ADHD",
+              "ASD, ADHD, specific learning disability in math and reading",
+              "ASD, hyperlexia",
+              "ASD, PDDNOS, ADHD",
+              "Aspergers, ADHD, visual impairment, twice-exceptional",
+              "ASD, ADHD, anxiety, spatial coordination disorder",
+              "ASD, ADHD, Hearing impairment, Separation anxiety disorder",
+              "ASD, ADHD, behavioral disorder (unspecified)",
+              "ASD, sensory processing disorder",
+              "Autism, ADHD",
+              "ASD, ADHD, Irritability syndrome, sleep disorder",
+              "ASD, Autism, ADHD",
+              "Atypical Autism (F84.1)",
+              "Childhood Autism (F84)",
+              "abcct-main.10.asd",
+              "abcct-main.11.asd",
+              "ASD_ATA",
+              "Asperger",
+              "PDD NOS",
+              "Autism, Sensory Processing Delays",
+              "Autism, Aggresive oppositional disorder, Pica, ADHD, High fever syndrome",
+              "Autisim, OCD, Pica, ADHD, Developmental Delay",
+              "PDD Autism",
+              "Autism Spectrum Disorder, ADHD",
+              "PDD",
+              "Autism, PDD NOS",
+              "Asperger?s Syndrome (F84.5)",
+              "OCD, ASD",
+              "Tic, Anxiety, ASD, ADHD, MDD",
+              "OCD, ADHD, PDD, NOS",
+              "OC Behaviors, ASD, Separation Anxiety",
+              "OCD, Social Phobia, ASD",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 18",
+              "ADOS diagnosis of ASD with language impairments; Overall Total ADOS score of14",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 16",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 19",
+              "ADOS diagnosis of autism: Overall Total ADOS score of 24",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 22",
+              "ADOS diagnosis of Autism Spectrum; Overall Total ADOS score of 9",
+              "ADOS diagnosis of ASD level 2 with moderate ID; Overall Total ADOS score of 15",
+              "ADOS diagnosis of ASD level 2 with mild ID; Overall Total ADOS score of 17",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 22",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 21",
+              "ADOS diagnosis of mod/severe ASD; Overall Total ASD score of 16",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 8",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 15",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 17",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 21",
+              "ADOS diagnosis of autism; Overall Total ADOS score of 20",
+              "ADOS diagnosis of ASD level 2; Overall Total ADOS score of 14",
+              "ADOS diagnosis of mild ASD; Overall Total ADOS score of 9",
+              "ADOS diagnosis of Autism Spectrum; Overall Total ADOS score of 13",
+              "ADOS diagnosis of mild ASD; Overall Total ADOS score of 10",
+              "Autism Spectrum Disorder (ASD)",
+              "depression and Aspergers",
+              "PDDNOS / Autism Spectrum",
+              "PDD-NOS  /  Autism Spectrum  /  Asperger's Syndrome",
+              "PDD-NOS / Autism Spectrum",
+              "Autism- Severe, Intellectual Disability",
+              "Autism, Intellectual Disability",
+              "Autism- Moderate, Intellectual Disability",
+              "Autism- Severe, Intellectual Disability, Epilepsy",
+              "Autism- Severe Intellectual Disability",
+              "Autism, Intellectual Disability, Epilepsy",
+              "Asperger's",
+              "Autism Spectrum Disorders",
+              "Autism (at age 1.5 by Dr. Edward Hoffman)",
+              "Autism (18 months at CMH)",
+              "Autism (2017, age 5)",
+              "Idiopathic Autism Spectrum Disorder",
+              "Austism Spectrum Disorder (Other Specified Neurodevelopmental Disorder, Austism Spectrum Disorder, full criteria not assessed)",
+              "Austism Spectrum Disorder (Other Specified Neurodevelopmental Disorder, Austism Spectrum Disorder, full criteria not met)",
+              "Austism Spectrum Disorder",
+              "ASD Group",
+              "ASD and ADHD Combined Group",
+              "AUTISM, DMDD",
+              "AUTISM",
+              "ASD, ADHD, ODD, OCD",
+              "MDD, ASD, ADHD, DMDD, Insomnia",
+              "AUTISM, ADHD",
+              "ASD, anxiety, ADHD, parent-child conflict",
+              "Autism, ADHD, insomnia",
+              "ADHD, ASD, bipolar d/o, PTSD",
+              "ADHD, AUTISM",
+              "Autism and ADHD-I and specific phobia butterflies and dogs",
+              "Autism and ADHD-Combined",
+              "Autism and ADHD-HI and Generalized Anxiety",
+              "Autism and ADHD-HI",
+              "Autism and Generalized Anxiety",
+              "Autism and ADHD-HI and specific phobia-animal(insects)",
+              "ASD and ADHD-HI and Depression NOS",
+              "Autism and  specific phobias (snakes; planes); encopresis; persistent motor or vocal tic disorder with vocal tics only",
+              "Autism and ADHD-Combined and persistent motor or vocal tic disorder (vocal tics only)",
+              "Autism and comorbid depression NOS",
+              "Autism and specific phobia of dogs",
+              "Autism and ADHD-Combined and Generalized Anxiety and persistent tic disorder (motor)",
+              "Autism and unspecified depressive disorder",
+              "Autism spectrum",
+              "idiopathic autism spectrum disorder",
+              "ASD, ADHD, Speech Delay",
+              "ASD Level 1 and ADHD combo",
+              "Austism",
+              "Mild autism",
+              "HFA,Autism",
+              "ASD+LI",
+              "ASD-LI",
+              "Non Control",
+              "309.9; 314; 314.01; 424.1; 745.5; 746.4; 753.13; 780.09; 299.80; 315",
+              "319; 315.5; 314.01; 299.9; 315.32; 315.39",
+              "319; 315.5; 314.01; 300; 299; 299.9; 315.39; 315.32",
+              "319; 300; 299; 315.39; 315.32; 299; 319; 345.9",
+              "319; 315.5; 314.01; 300; 299.9; 300.3; 315.32; 307",
+              "314.01; 296.80; 300; 299; 299.8; 299.9; 315.32",
+              "319; 315.5; 314.01; 300; 299; 315.39; 315.32",
+              "319; 315.5; 299; 315.32",
+              "319; 315.5; 314.01; 299.9",
+              "319; 314.01; 299; 315.39",
+              "319; 315.5; 314.01; 299; 315.39",
+              "299; 300; 307.3; 318",
+              "319; 315.5; 300; 299; 299.9; 300.3; 307.2; 315.39; 315.32; 307",
+              "299; 307",
+              "299; 315.5",
+              "319; 315.5; 299; 315.39; 315.32",
+              "319; 315.5; 300; 299; 315.39",
+              "299; 315.5; 315.32",
+              "299.8; 315.5; 784.69",
+              "309.81; 319; 315.5; 299; 299.9; 313.81; 315.39; 315.32",
+              "299; 315",
+              "315.5; 299; 315.32; 315.39",
+              "299; 319; 315.39",
+              "299; 314.01; 315",
+              "315.5; 299; 315.39; 315.32",
+              "299; 315.5; 318.2; 345.9",
+              "Calculated using ADOS vars [ADOS_module ADOS_SARRB ADOS_Olang] and Mullen vars [MSLelTscore MSLvrTscore MSLrlTscore MSLfmTscore]",
+              "758.32; 315.4; 315.31; 314.01; 299.00",
+              "Specific Phobia/ASD",
+              "Autism Spectrum Affected",
+              "Autism Diagnosis",
+              "High-functioning ASD and impairing anxiety",
+              "ADOS diagnosis of Autism Spectrum; Overall Total ADOS score of 12",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 23",
+              "ADOS diagnosis of Autism; Overall Total ADOS score of 14",
+              "Autsim",
+              "AutismSpectrumDisorder",
+              "asd",
+              "Auditory ASD, 7255",
+              "Auditory ASD, 7357",
+              "Auditory ASD, 7354",
+              "Auditory ASD, 7309",
+              "Auditory ASD, 7310",
+              "Autistic",
+              "ASD and ADHD-I",
+              "ASD and ADHD-C",
+              "ASD and ADHD-C and specific phobia of cacti",
+              "ASD and ADHD-C and ODD",
+              "ASD and moderate intellectual disability",
+              "ASD and OCD and specific phobia of dogs",
+              "ASD and ADHD-nos",
+              "ASD and GAD",
+              "pdd-nos")
+
+
+D_subset = subset(D, is.element(D$phenotype,asd_codes))
+all_subs = unique(D_subset$subjectkey)
+
+# tabulate how many duplicates are present
+dup_table = table(D_subset$subjectkey)
+dup_mask = dup_table>1
+dup_subs = rownames(dup_mask)[dup_mask==TRUE]
+nondup_subs = rownames(dup_mask)[dup_mask==FALSE]
+
+# grab duplicate subjects
+D_dup = D_subset[is.element(D_subset$subjectkey,dup_subs),]
+
+D_dup_select = data.frame(matrix(nrow = length(dup_subs), ncol = dim(D)[2]))
+colnames(D_dup_select) = colnames(D)
+rownames(D_dup_select) = dup_subs
+
+# grab non-duplicate subjects
+D_nondup = D_subset[is.element(D_subset$subjectkey,nondup_subs),]
+rownames(D_nondup) = D_nondup$subjectkey
+
+# choose what to do for duplicate subjects
+for (sub in dup_subs){
+  tmp = D_dup[D_dup$subjectkey==sub,]
+  unique_intage = sort(unique(tmp$interview_age))
+  if (length(unique_intage)==1){
+    D_dup_select[sub,] = tmp[1,]
+  } else if (length(unique_intage)!=1){
+    D_dup_select[sub,] = tmp[tmp$interview_age==unique_intage[1],]
+  } # if
+} # for
+
+D_new = rbind(D_nondup,D_dup_select)
+
+# now find subjects with NA
+all_items = c(adi_A1_items, adi_A2_items, adi_A3_items, adi_B1_items, adi_B2_items, adi_B3_items, adi_B4_items)
+sum_all_items = rowSums(D_new[,all_items], na.rm = TRUE)
+zero_mask = sum_all_items==0
+missing_subs = names(zero_mask[zero_mask==TRUE])
+
+D_new = D_new[!is.element(D_new$subjectkey,missing_subs),]
+
+D_orig = D
+D = D_new
+
+backgrnd_vars2use = c("collection_id",
+                      "dataset_id",
+                      "subjectkey",
+                      "sex",
+                      "interview_age",
+                      "bkgrnd_diag",
+                      "rx",
+                      "bkgrnd_med")
+
+# print out number of unique datasets
+sprintf("Number of datasets = %d",length(unique(D$collection_id)))
+
+#print out number of unique individuals
+sprintf("Number of individuals = %d",dim(D)[1])
+```
+
+Rescore data
+
+```{r, warning=FALSE, message=FALSE}
+# nonverbal masks
+# acquisition of words
+mask1 = D[,c("acqorlossoflang_aword")]>900 | is.na(D[,c("acqorlossoflang_aword")]) 
+# acquisition of phrases
+mask2 = D[,c("acqorlossoflang_aphrase")]>900 | is.na(D[,c("acqorlossoflang_aphrase")])
+# social verbalization, chit chat
+mask3 = is.na(D[,"funccom_cchat"]) | D[,"funccom_cchat"]==7 | D[,"funccom_cchat"]==8 | D[,"funccom_cchat"]==9 
+# reciprocal conversation
+mask4 = is.na(D[,"funccom_chat5"]) | D[,"funccom_chat5"]==7 | D[,"funccom_chat5"]==8 | D[,"funccom_chat5"]==9 
+# inappropriate questions
+mask5 = is.na(D[,"funccom_cinappq"]) | D[,"funccom_cinappq"]==7 | D[,"funccom_cinappq"]==8 | 
+D[,"funccom_cinappq"]==9 
+# stereotype utterances and delayed echolalia 
+mask6 = is.na(D[,"funccom_estereo"]) | D[,"funccom_estereo"]==7 | D[,"funccom_estereo"]==8 | 
+D[,"funccom_estereo"]==9 
+# pronominal reversal 
+mask7 = is.na(D[,"funccom_epron"]) | D[,"funccom_epron"]==7 | D[,"funccom_epron"]==8 | 
+D[,"funccom_epron"]==9 
+# neologisms and idiosyncratic language 
+mask8 = is.na(D[,"funccom_eneoid"]) | D[,"funccom_eneoid"]==7 | D[,"funccom_eneoid"]==8 | 
+D[,"funccom_eneoid"]==9 
+# verbal rituals 
+mask9 = is.na(D[,"funccom_everrit"]) | D[,"funccom_everrit"]==7 | D[,"funccom_everrit"]==8 | 
+D[,"funccom_everrit"]==9 
+
+# mask of subjects that are likely nonverbal because of missing data across all these communication items
+nonverbal_mask = mask3 & mask4 & mask5 & mask6 & mask7 & mask8 & mask9
+
+# replace A1 scores with rescored data
+D$dbaes_a1_orig = D$dbaes_a1
+D$dbaes_a1 = RescoreADI_DSM5(D, adi_A1_items, "A1")
+
+# replace A2 scores with rescored data
+D$dbaes_a2_orig = D$dbaes_a2
+D$dbaes_a2 = RescoreADI_DSM5(D, adi_A2_items, "A2")
+
+# replace A3 scores with rescored data
+D$dbaes_a3_orig = D$dbaes_a3
+D$dbaes_a3 = RescoreADI_DSM5(D, adi_A3_items, "A3")
+
+# replace B1 scores with rescored data
+D$dbaes_b1_orig = D$dbaes_b1
+D$dbaes_b1 = RescoreADI_DSM5(D, adi_B1_items, "B1")
+
+# replace B2 scores with rescored data
+D$dbaes_b2_orig = D$dbaes_b2
+D$dbaes_b2 = RescoreADI_DSM5(D, adi_B2_items, "B2")
+
+# replace B3 scores with rescored data
+D$dbaes_b3_orig = D$dbaes_b3
+D$dbaes_b3 = RescoreADI_DSM5(D, adi_B3_items, "B3")
+
+# replace B4 scores with rescored data
+D$dbaes_b4_orig = D$dbaes_b4
+D$dbaes_b4 = RescoreADI_DSM5(D, adi_B4_items, "B4")
+
+# score DSMIV verbal items
+D$dbaes_dsmivverbal_total = RescoreADI_DSM5(D, adi_DSMIVverbal_items, "DSMIVverbal")
+
+# recompute the atotal
+D$dbaes_atotal = (D$dbaes_a1 + D$dbaes_a2 + D$dbaes_a3)/3
+
+# recompute the btotal
+D$dbaes_btotal = (D$dbaes_b1 + D$dbaes_b2 +  D$dbaes_b3 + D$dbaes_b4)/4
+
+# dataset to exclude because of lots of zeros UW ACE Extended Family Study
+dsetID2exclude = c(8395)
+mask = is.element(D$dataset_id,dsetID2exclude)
+D = D[!mask,]
+
+# missing data codes
+missingCodes = c(-999,999,9999)
+atotal_missingMask = is.element(D$dbaes_atotal,missingCodes) | is.na(D$dbaes_atotal)
+btotal_missingMask = is.element(D$dbaes_btotal,missingCodes) | is.na(D$dbaes_btotal)
+
+# verbal_mask = !is.na(D$dbaes_dsmivverbal_total)
+verbal_mask = !nonverbal_mask
+# find subjects with A, B totals
+verbal_ONLY_submask = !atotal_missingMask & !btotal_missingMask & verbal_mask
+# # # find subjects with A, B C totals
+nonverbal_ONLY_submask = !atotal_missingMask & !btotal_missingMask & !verbal_mask
+
+
+vars2use = c(backgrnd_vars2use, "dbaes_dsmivverbal_total",
+             adi_total_vars2use, adi_subtotal_vars2use,
+             adi_A1_items, adi_A2_items, adi_A3_items,
+             adi_B1_items, adi_B2_items, adi_B3_items, adi_B4_items)
+
+Dverbal = D[verbal_ONLY_submask, vars2use]
+Dnonverbal = D[nonverbal_ONLY_submask, vars2use]
+
+# print total number of individuals from verbal subset
+sprintf("Number of individuals with verbal ADI-R data = %d",dim(Dverbal)[1])
+
+# print out total number of datasets within verbal subset
+sprintf("Number of datasets with verbal ADI-R data = %d",length(unique(Dverbal$collection_id)))
+
+# print total number of individuals from nonverbal subset
+sprintf("Number of individuals with nonverbal ADI-R data = %d",dim(Dnonverbal)[1])
+
+# print out total number of datasets within nonverbal subset
+sprintf("Number of datasets with nonverbal ADI-R data = %d",length(unique(Dnonverbal$collection_id)))
+
+table(Dverbal$sex)
+mean(Dverbal$interview_age,na.rm=TRUE)/12
+sd(Dverbal$interview_age,na.rm=TRUE)/12
+```
+
+Split datasets
+
+```{r, warning=FALSE, message=FALSE}
+# Split datasets by sex
+rngSeed = 1
+
+# split verbal dataset
+tmp_d = SplitDatasetsBySex(Dverbal, rngSeed = rngSeed)
+Dverbal_Discovery = tmp_d[[1]]
+Dverbal_Replication = tmp_d[[2]]
+
+c(dim(Dverbal_Discovery)[1], dim(Dverbal_Replication)[1])
+
+table(Dverbal_Discovery$sex)
+mean(Dverbal_Discovery$interview_age,na.rm=TRUE)/12
+sd(Dverbal_Discovery$interview_age,na.rm=TRUE)/12
+
+table(Dverbal_Replication$sex)
+mean(Dverbal_Replication$interview_age,na.rm=TRUE)/12
+sd(Dverbal_Replication$interview_age,na.rm=TRUE)/12
+
+# Split datasets by sex
+rngSeed = 1
+# split nonverbal dataset
+tmp_d = SplitDatasetsBySex(Dnonverbal, rngSeed = rngSeed)
+Dnonverbal_Discovery = tmp_d[[1]]
+Dnonverbal_Replication = tmp_d[[2]]
+
+c(dim(Dnonverbal_Discovery)[1], dim(Dnonverbal_Replication)[1])
+
+table(Dnonverbal_Discovery$sex)
+mean(Dnonverbal_Discovery$interview_age,na.rm=TRUE)/12
+sd(Dnonverbal_Discovery$interview_age,na.rm=TRUE)/12
+
+table(Dnonverbal_Replication$sex)
+mean(Dnonverbal_Replication$interview_age,na.rm=TRUE)/12
+sd(Dnonverbal_Replication$interview_age,na.rm=TRUE)/12
+```
+
+Save out datasets
+
+```{r, warning=FALSE, message=FALSE}
+write.csv(Dverbal, file = file.path(datapath,"tidy_verbal.csv"))
+write.csv(Dnonverbal, file = file.path(datapath,"tidy_nonverbal.csv"))
+write.csv(Dverbal_Discovery, file = file.path(datapath,"tidy_verbal_disc.csv"))
+write.csv(Dverbal_Replication, file = file.path(datapath,"tidy_verbal_rep.csv"))
+write.csv(Dnonverbal_Discovery, file = file.path(datapath,"tidy_nonverbal_disc.csv"))
+write.csv(Dnonverbal_Replication, file = file.path(datapath,"tidy_nonverbal_rep.csv"))
+```
+
+
+# EU-AIMS LEAP
+
+Load libraries and data
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries("readxl","reshape2","here","ggplot2")
+source(here("code","euaims_functions.R"))
+source(here("code","get_ggColorHue.R"))
+
+rootpath = here()
+datapath = here("data")
+rawpath = here("raw_data")
+plotpath = here("plots","euaims")
+fname = "ADI-R_V01_2017-10-27_13_04_04.xlsx"
+
+fname2open = file.path(rawpath, fname)
+df = read_excel(fname2open)
+
+df2 = read_excel("/Users/mlombardo/Dropbox/euaims/data/rsfmri_preproc/euaims_preproc.xlsx")
+df = merge(df2[,c("subid","age")],df,by.x="subid",by.y="ID")
+df$age_years = df$age/365 
+```
+
+Score ADI-R by DSM-5
+
+```{r, warning=FALSE, message=FALSE}
+# run scoring function
+df = scoreADI_DSM5(df)
+```
+
+Save out data
+
+```{r, warning=FALSE, message=FALSE}
+write.csv(df, file = file.path(datapath,"tidy_euaims.csv"))
+```

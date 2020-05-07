@@ -141,7 +141,6 @@ backgroundTotal = 20787
 for (i in 1:length(geneclasses)){
   # intersect with background list
   genes2 = geneclasses[[i]]
-  # mask = is.element(genes2, bglist)
   genes2 = data.frame(genes2)
 
   # IC07

@@ -1,0 +1,3795 @@
+---
+title: "Connectivity Analyses"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## EU-AIMS ADI-R Subtyping Connectivity Analysis
+
+
+```{r, warning=FALSE, message=FALSE}
+easypackages::libraries(c("here","ggplot2","nlme","readxl","matlabr","circlize","scico"))
+source("/Users/mlombardo/Dropbox/GitHubRepos/utils/cohens_d.R")
+source("/Users/mlombardo/Dropbox/R/Repfunctionspack6.R")
+source("/Users/mlombardo/Dropbox/R/get_ggColorHue.R")
+fdr_thresh = 0.05
+
+options(matlab.path = "/Applications/MATLAB_R2019b.app/bin")
+
+rootpath = "/Users/mlombardo/Dropbox/euaims/data/adir"
+datapath = here("data")
+codepath = here("code")
+resultpath = here("results")
+plotpath = here("plots")
+
+```
+
+## Run the MATLAB script that estimates the partial correlations 
+```{r, warning=FALSE, message=FALSE}
+RUNMATLAB = FALSE
+
+if (RUNMATLAB){
+  # z = 0.5
+  code2run = sprintf("cd %s; estimateConnectivity_z05('%s',0,1);",codepath,"ridge")
+  res = run_matlab_code(code2run)
+  
+  # z = 0.6
+  code2run = sprintf("cd %s; estimateConnectivity_z06('%s',0,1);",codepath,"ridge")
+  res = run_matlab_code(code2run)
+  
+  # z = 0.7
+  code2run = sprintf("cd %s; estimateConnectivity_z07('%s',0,1);",codepath,"ridge")
+  res = run_matlab_code(code2run)
+
+  # z = 0.8
+  code2run = sprintf("cd %s; estimateConnectivity_z08('%s',0,1);",codepath,"ridge")
+  res = run_matlab_code(code2run)
+  
+  # z = 0.9
+  code2run = sprintf("cd %s; estimateConnectivity_z09('%s',0,1);",codepath,"ridge")
+  res = run_matlab_code(code2run)
+  
+  # z = 1
+  code2run = sprintf("cd %s; estimateConnectivity_z1('%s',0,1);",codepath,"ridge")
+  res = run_matlab_code(code2run)
+}
+```
+
+## Main analysis - Z = 0.5
+```{r, warning=FALSE, message=FALSE}
+# Z threshold
+z_thresh = 0.5
+
+fname = sprintf("partialCorData_ridge_lambda1.diffzscoreGrps_z%s.txt",as.character(z_thresh))
+
+fname2open = file.path(datapath, fname)
+df = read.delim(fname2open)
+df = subset(df,df$subgrp!="RRB_over_SC")
+
+tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
+tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
+
+asd_df = merge(tmp_df[,c("subid","A1_pct_severity","A2_pct_severity","A3_pct_severity",
+                        "B1_pct_severity","B2_pct_severity","B3_pct_severity","B4_pct_severity",
+                        "A_pct_severity","B_pct_severity","z_ds")],
+           df,
+           by="subid")
+
+
+vine_df = read.csv(here("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z1.csv"))
+
+asd_df = merge(asd_df, vine_df[,c("subid","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")], by = "subid")
+  
+#------------------------------------------------------------------------------
+# Main analysis
+RUNANALYSIS = TRUE
+
+if (RUNANALYSIS==TRUE) {
+  
+  # columns with connectivity data
+  vars2use = colnames(df)[10:ncol(df)]
+  
+  cnames = c("compNames",
+             "SCequalRRB_Disc_vs_TD.tstat","SCequalRRB_Disc_vs_TD.pval", 
+             "SCequalRRB_Disc_vs_TD.es","SCequalRRB_Disc_vs_TD.AIC","SCequalRRB_Disc_vs_TD.BIC",
+             "SCequalRRB_Rep_vs_TD.tstat","SCequalRRB_Rep_vs_TD.pval","SCequalRRB_Rep_vs_TD.es", 
+             "SCequalRRB_Rep_vs_TD.AIC","SCequalRRB_Rep_vs_TD.BIC", "SCequalRRB.repBF",
+             "SCoverRRB_Disc_vs_TD.tstat","SCoverRRB_Disc_vs_TD.pval", 
+             "SCoverRRB_Disc_vs_TD.es","SCoverRRB_Disc_vs_TD.AIC","SCoverRRB_Disc_vs_TD.BIC",
+             "SCoverRRB_Rep_vs_TD.tstat","SCoverRRB_Rep_vs_TD.pval","SCoverRRB_Rep_vs_TD.es",
+             "SCoverRRB_Rep_vs_TD.AIC","SCoverRRB_Rep_vs_TD.BIC", "SCoverRRB.repBF",
+             "SCequalRRB_Disc_vs_SCoverRRB.tstat","SCequalRRB_Disc_vs_SCoverRRB.pval",
+             "SCequalRRB_Disc_vs_SCoverRRB.es","SCequalRRB_Disc_vs_SCoverRRB.AIC","SCequalRRB_Disc_vs_SCoverRRB.BIC",
+             "SCequalRRB_Rep_vs_SCoverRRB.tstat","SCequalRRB_Rep_vs_SCoverRRB.pval","SCequalRRB_Rep_vs_SCoverRRB.es",
+             "SCequalRRB_Rep_vs_SCoverRRB.AIC","SCequalRRB_Rep_vs_SCoverRRB.BIC","SCequalRRB_vs_SCoverRRB.repBF")
+  
+  aovres = data.frame(matrix(nrow = length(vars2use),ncol = length(cnames)))
+  colnames(aovres) = cnames
+  rownames(aovres) = vars2use
+  aovres$compNames = vars2use
+  vars2loop = c(1:length(vars2use))
+
+  for (i in vars2loop) {
+  	y_var = vars2use[i]
+
+    # run analyses on Discovery and Replication datasets
+  	df_Disc = subset(df, df$dataset=="Discovery")
+    df_Rep = subset(df, df$dataset=="Replication")
+
+    
+    #--------------------------------------------------------------------------
+    # Discovery 
+    
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Disc,
+  	                              na.action = na.omit)))
+    df_Disc$data2plot = resid(mod2use)
+  
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Disc.BIC = BIC(mod2use)
+    
+  	DASD2 = subset(df_Disc, df_Disc$subgrp=="SC_over_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Disc.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Disc, df_Disc$subgrp=="RRB_over_SC" | df_Disc$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Disc_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Disc_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Disc.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Disc.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc.BIC = BIC(mod2use)
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.tstat"] = SCequalRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.pval"] = SCequalRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.AIC"] = SCequalRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.BIC"] = SCequalRRB_vs_TD_Disc.BIC
+
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.tstat"] = SCoverRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.pval"] = SCoverRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.AIC"] = SCoverRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.BIC"] = SCoverRRB_vs_TD_Disc.BIC
+
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.tstat"] = RRBoverSC_vs_TD_Disc_statistic
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.pval"] = RRBoverSC_vs_TD_Disc_p.value
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="RRB_over_SC"],
+    #                                          df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.AIC"] = RRBoverSC_vs_TD_Disc.AIC
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.BIC"] = RRBoverSC_vs_TD_Disc.BIC
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Disc.BIC
+
+    #--------------------------------------------------------------------------
+    # Replication
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Rep,
+  	                              na.action = na.omit)))
+    df_Rep$data2plot = resid(mod2use)
+
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  	DASD2 = subset(df_Rep, df_Rep$subgrp=="SC_over_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Rep, df_Rep$subgrp=="RRB_over_SC" | df_Rep$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Rep_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Rep_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Rep.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Rep.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep.BIC = BIC(mod2use)
+
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.tstat"] = SCequalRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.pval"] = SCequalRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.AIC"] = SCequalRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.BIC"] = SCequalRRB_vs_TD_Rep.BIC
+
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.tstat"] = SCoverRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.pval"] = SCoverRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.AIC"] = SCoverRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.BIC"] = SCoverRRB_vs_TD_Rep.BIC
+
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.tstat"] = RRBoverSC_vs_TD_Rep_statistic
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.pval"] = RRBoverSC_vs_TD_Rep_p.value
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="RRB_over_SC"],
+    #                                         df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.AIC"] = RRBoverSC_vs_TD_Rep.AIC
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.BIC"] = RRBoverSC_vs_TD_Rep.BIC
+    
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                             df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Rep.BIC
+
+    current_state = sprintf("Loop %d",i)
+    fname2save = file.path(resultpath,"anova_allconnections","monitor.csv")
+    write.table(current_state, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+  
+    #--------------------------------------------------------------------------
+    # compute replication Bayes Factors
+    res_bf = BFSALL(tobs = SCequalRRB_vs_TD_Disc_statistic, 
+                      trep = SCequalRRB_vs_TD_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="TD"), 
+                      m2 = sum(df_Rep$subgrp=="TD"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB.repBF"] = res_bf[4,2]
+  
+    res_bf = BFSALL(tobs = SCoverRRB_vs_TD_Disc_statistic, 
+                    trep = SCoverRRB_vs_TD_Rep_statistic,
+                    n1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                    n2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                    m1 = sum(df_Disc$subgrp=="TD"), 
+                    m2 = sum(df_Rep$subgrp=="TD"),
+                    sample = 2, 
+                    Type = 'ALL')
+    aovres[y_var,"SCoverRRB.repBF"] = res_bf[4,2]
+  
+    # # print("RRBoverSC")
+    # res_bf = BFSALL(tobs = RRBoverSC_vs_TD_Disc_statistic, 
+    #                 trep = RRBoverSC_vs_TD_Rep_statistic, 
+    #                 n1 = sum(df_Disc$subgrp=="RRB_over_SC"), 
+    #                 n2 = sum(df_Rep$subgrp=="RRB_over_SC"),
+    #                 m1 = sum(df_Disc$subgrp=="TD"), 
+    #                 m2 = sum(df_Rep$subgrp=="TD"),
+    #                 sample = 2,
+    #                 Type = 'ALL')
+    # aovres[y_var,"RRBoverSC.repBF"] = res_bf[4,2]
+    
+    res_bf = BFSALL(tobs = SCequalRRB_vs_SCoverRRB_Disc_statistic, 
+                      trep = SCequalRRB_vs_SCoverRRB_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                      m2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf[4,2]
+
+    # save results to a file
+    fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+    write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+  }
+  
+  mask1 = aovres$SCequalRRB.repBF>=10
+  mask2 = aovres$SCoverRRB.repBF>=10
+  # mask3 = aovres$RRBoverSC.repBF>=10
+  mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+  mask_allBF = mask1 | mask2 | mask4
+  print(aovres[mask_allBF,])
+  
+  # save results to a file
+  fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+  write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+} else {
+  
+  fname = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_z%s.xlsx",as.character(z_thresh)))
+  aovres = read_excel(fname)
+}
+
+mask1 = aovres$SCequalRRB.repBF>=10
+mask2 = aovres$SCoverRRB.repBF>=10
+# mask3 = aovres$RRBoverSC.repBF>=10
+mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+mask_allBF = mask1 | mask2 | mask4 
+
+aovres[mask_allBF,c("compNames","SCequalRRB.repBF","SCoverRRB.repBF")]
+
+#------------------------------------------------------------------------------
+# Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (aovres[comp_pair,"SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCequalRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCequalRRB_Rep_vs_TD.pval"]<0.05){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCoverRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCoverRRB_Rep_vs_TD.pval"]<0.05){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+}
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+```
+
+## Main analysis - Z = 0.6
+
+```{r, warning=FALSE, message=FALSE}
+# Z threshold
+z_thresh = 0.6
+
+fname = sprintf("partialCorData_ridge_lambda1.diffzscoreGrps_z%s.txt",as.character(z_thresh))
+
+fname2open = file.path(datapath, fname)
+df = read.delim(fname2open)
+df = subset(df,df$subgrp!="RRB_over_SC")
+
+tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
+tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
+
+asd_df = merge(tmp_df[,c("subid","A1_pct_severity","A2_pct_severity","A3_pct_severity",
+                        "B1_pct_severity","B2_pct_severity","B3_pct_severity","B4_pct_severity",
+                        "A_pct_severity","B_pct_severity","z_ds")],
+           df,
+           by="subid")
+
+vine_df = read.csv(here("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z1.csv"))
+
+asd_df = merge(asd_df, vine_df[,c("subid","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")], by = "subid")
+
+#------------------------------------------------------------------------------
+# Main analysis 
+RUNANALYSIS = TRUE
+
+if (RUNANALYSIS==TRUE) {
+  
+  # columns with connectivity data
+  vars2use = colnames(df)[10:ncol(df)]
+  
+  cnames = c("compNames",
+             "SCequalRRB_Disc_vs_TD.tstat","SCequalRRB_Disc_vs_TD.pval", 
+             "SCequalRRB_Disc_vs_TD.es","SCequalRRB_Disc_vs_TD.AIC","SCequalRRB_Disc_vs_TD.BIC",
+             "SCequalRRB_Rep_vs_TD.tstat","SCequalRRB_Rep_vs_TD.pval","SCequalRRB_Rep_vs_TD.es", 
+             "SCequalRRB_Rep_vs_TD.AIC","SCequalRRB_Rep_vs_TD.BIC", "SCequalRRB.repBF",
+             "SCoverRRB_Disc_vs_TD.tstat","SCoverRRB_Disc_vs_TD.pval", 
+             "SCoverRRB_Disc_vs_TD.es","SCoverRRB_Disc_vs_TD.AIC","SCoverRRB_Disc_vs_TD.BIC",
+             "SCoverRRB_Rep_vs_TD.tstat","SCoverRRB_Rep_vs_TD.pval","SCoverRRB_Rep_vs_TD.es",
+             "SCoverRRB_Rep_vs_TD.AIC","SCoverRRB_Rep_vs_TD.BIC", "SCoverRRB.repBF",
+             "SCequalRRB_Disc_vs_SCoverRRB.tstat","SCequalRRB_Disc_vs_SCoverRRB.pval",
+             "SCequalRRB_Disc_vs_SCoverRRB.es","SCequalRRB_Disc_vs_SCoverRRB.AIC","SCequalRRB_Disc_vs_SCoverRRB.BIC",
+             "SCequalRRB_Rep_vs_SCoverRRB.tstat","SCequalRRB_Rep_vs_SCoverRRB.pval","SCequalRRB_Rep_vs_SCoverRRB.es",
+             "SCequalRRB_Rep_vs_SCoverRRB.AIC","SCequalRRB_Rep_vs_SCoverRRB.BIC","SCequalRRB_vs_SCoverRRB.repBF")
+  
+  aovres = data.frame(matrix(nrow = length(vars2use),ncol = length(cnames)))
+  colnames(aovres) = cnames
+  rownames(aovres) = vars2use
+  aovres$compNames = vars2use
+  vars2loop = c(1:length(vars2use))
+
+  for (i in vars2loop) {
+  	y_var = vars2use[i]
+
+    # run analyses on Discovery and Replication datasets
+  	df_Disc = subset(df, df$dataset=="Discovery")
+    df_Rep = subset(df, df$dataset=="Replication")
+    
+    #--------------------------------------------------------------------------
+    # Discovery
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Disc,
+  	                              na.action = na.omit)))
+    df_Disc$data2plot = resid(mod2use)
+  
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Disc.BIC = BIC(mod2use)
+    
+  	DASD2 = subset(df_Disc, df_Disc$subgrp=="SC_over_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Disc.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Disc, df_Disc$subgrp=="RRB_over_SC" | df_Disc$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Disc_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Disc_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Disc.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Disc.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc.BIC = BIC(mod2use)
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.tstat"] = SCequalRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.pval"] = SCequalRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.AIC"] = SCequalRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.BIC"] = SCequalRRB_vs_TD_Disc.BIC
+
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.tstat"] = SCoverRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.pval"] = SCoverRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.AIC"] = SCoverRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.BIC"] = SCoverRRB_vs_TD_Disc.BIC
+
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.tstat"] = RRBoverSC_vs_TD_Disc_statistic
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.pval"] = RRBoverSC_vs_TD_Disc_p.value
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="RRB_over_SC"],
+    #                                          df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.AIC"] = RRBoverSC_vs_TD_Disc.AIC
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.BIC"] = RRBoverSC_vs_TD_Disc.BIC
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Disc.BIC
+
+    #--------------------------------------------------------------------------
+    # Replication
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Rep,
+  	                              na.action = na.omit)))
+    df_Rep$data2plot = resid(mod2use)
+
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  	DASD2 = subset(df_Rep, df_Rep$subgrp=="SC_over_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Rep, df_Rep$subgrp=="RRB_over_SC" | df_Rep$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Rep_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Rep_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Rep.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Rep.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep.BIC = BIC(mod2use)
+
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.tstat"] = SCequalRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.pval"] = SCequalRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.AIC"] = SCequalRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.BIC"] = SCequalRRB_vs_TD_Rep.BIC
+
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.tstat"] = SCoverRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.pval"] = SCoverRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.AIC"] = SCoverRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.BIC"] = SCoverRRB_vs_TD_Rep.BIC
+
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.tstat"] = RRBoverSC_vs_TD_Rep_statistic
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.pval"] = RRBoverSC_vs_TD_Rep_p.value
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="RRB_over_SC"],
+    #                                         df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.AIC"] = RRBoverSC_vs_TD_Rep.AIC
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.BIC"] = RRBoverSC_vs_TD_Rep.BIC
+    
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                             df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Rep.BIC
+
+    current_state = sprintf("Loop %d",i)
+    fname2save = file.path(resultpath,"anova_allconnections","monitor.csv")
+    write.table(current_state, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+  
+    #--------------------------------------------------------------------------
+    # compute replication Bayes Factors
+    res_bf = BFSALL(tobs = SCequalRRB_vs_TD_Disc_statistic, 
+                      trep = SCequalRRB_vs_TD_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="TD"), 
+                      m2 = sum(df_Rep$subgrp=="TD"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB.repBF"] = res_bf[4,2]
+  
+    res_bf = BFSALL(tobs = SCoverRRB_vs_TD_Disc_statistic, 
+                    trep = SCoverRRB_vs_TD_Rep_statistic,
+                    n1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                    n2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                    m1 = sum(df_Disc$subgrp=="TD"), 
+                    m2 = sum(df_Rep$subgrp=="TD"),
+                    sample = 2, 
+                    Type = 'ALL')
+    aovres[y_var,"SCoverRRB.repBF"] = res_bf[4,2]
+  
+    # # print("RRBoverSC")
+    # res_bf = BFSALL(tobs = RRBoverSC_vs_TD_Disc_statistic, 
+    #                 trep = RRBoverSC_vs_TD_Rep_statistic, 
+    #                 n1 = sum(df_Disc$subgrp=="RRB_over_SC"), 
+    #                 n2 = sum(df_Rep$subgrp=="RRB_over_SC"),
+    #                 m1 = sum(df_Disc$subgrp=="TD"), 
+    #                 m2 = sum(df_Rep$subgrp=="TD"),
+    #                 sample = 2,
+    #                 Type = 'ALL')
+    # aovres[y_var,"RRBoverSC.repBF"] = res_bf[4,2]
+    
+    res_bf = BFSALL(tobs = SCequalRRB_vs_SCoverRRB_Disc_statistic, 
+                      trep = SCequalRRB_vs_SCoverRRB_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                      m2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf[4,2]
+
+    # save results to a file
+    fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+    write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+  }
+  
+  mask1 = aovres$SCequalRRB.repBF>=10
+  mask2 = aovres$SCoverRRB.repBF>=10
+  # mask3 = aovres$RRBoverSC.repBF>=10
+  mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+  mask_allBF = mask1 | mask2 | mask4
+  print(aovres[mask_allBF,])
+  
+  # save results to a file
+  fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+  write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+} else {
+  
+  fname = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_z%s.xlsx",as.character(z_thresh)))
+  aovres = read_excel(fname)
+}
+
+mask1 = aovres$SCequalRRB.repBF>=10
+mask2 = aovres$SCoverRRB.repBF>=10
+# mask3 = aovres$RRBoverSC.repBF>=10
+mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+mask_allBF = mask1 | mask2 | mask4 
+
+aovres[mask_allBF,c("compNames","SCequalRRB.repBF","SCoverRRB.repBF")]
+
+#------------------------------------------------------------------------------
+# Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (aovres[comp_pair,"SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCequalRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCequalRRB_Rep_vs_TD.pval"]<0.05){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCoverRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCoverRRB_Rep_vs_TD.pval"]<0.05){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+}
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+```
+
+
+## Main analysis - Z = 0.7
+
+```{r, warning=FALSE, message=FALSE}
+# Z threshold
+z_thresh = 0.7
+
+fname = sprintf("partialCorData_ridge_lambda1.diffzscoreGrps_z%s.txt",as.character(z_thresh))
+
+fname2open = file.path(datapath, fname)
+df = read.delim(fname2open)
+df = subset(df,df$subgrp!="RRB_over_SC")
+
+tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
+tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
+
+asd_df = merge(tmp_df[,c("subid","A1_pct_severity","A2_pct_severity","A3_pct_severity",
+                        "B1_pct_severity","B2_pct_severity","B3_pct_severity","B4_pct_severity",
+                        "A_pct_severity","B_pct_severity","z_ds")],
+           df,
+           by="subid")
+
+vine_df = read.csv(here("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z1.csv"))
+
+asd_df = merge(asd_df, vine_df[,c("subid","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")], by = "subid")
+
+#------------------------------------------------------------------------------
+# Main analysis
+RUNANALYSIS = TRUE
+
+if (RUNANALYSIS==TRUE) {
+  
+  # columns with connectivity data
+  vars2use = colnames(df)[10:ncol(df)]
+  
+  cnames = c("compNames",
+             "SCequalRRB_Disc_vs_TD.tstat","SCequalRRB_Disc_vs_TD.pval", 
+             "SCequalRRB_Disc_vs_TD.es","SCequalRRB_Disc_vs_TD.AIC","SCequalRRB_Disc_vs_TD.BIC",
+             "SCequalRRB_Rep_vs_TD.tstat","SCequalRRB_Rep_vs_TD.pval","SCequalRRB_Rep_vs_TD.es", 
+             "SCequalRRB_Rep_vs_TD.AIC","SCequalRRB_Rep_vs_TD.BIC", "SCequalRRB.repBF",
+             "SCoverRRB_Disc_vs_TD.tstat","SCoverRRB_Disc_vs_TD.pval", 
+             "SCoverRRB_Disc_vs_TD.es","SCoverRRB_Disc_vs_TD.AIC","SCoverRRB_Disc_vs_TD.BIC",
+             "SCoverRRB_Rep_vs_TD.tstat","SCoverRRB_Rep_vs_TD.pval","SCoverRRB_Rep_vs_TD.es",
+             "SCoverRRB_Rep_vs_TD.AIC","SCoverRRB_Rep_vs_TD.BIC", "SCoverRRB.repBF",
+             "SCequalRRB_Disc_vs_SCoverRRB.tstat","SCequalRRB_Disc_vs_SCoverRRB.pval",
+             "SCequalRRB_Disc_vs_SCoverRRB.es","SCequalRRB_Disc_vs_SCoverRRB.AIC","SCequalRRB_Disc_vs_SCoverRRB.BIC",
+             "SCequalRRB_Rep_vs_SCoverRRB.tstat","SCequalRRB_Rep_vs_SCoverRRB.pval","SCequalRRB_Rep_vs_SCoverRRB.es",
+             "SCequalRRB_Rep_vs_SCoverRRB.AIC","SCequalRRB_Rep_vs_SCoverRRB.BIC","SCequalRRB_vs_SCoverRRB.repBF")
+  
+  aovres = data.frame(matrix(nrow = length(vars2use),ncol = length(cnames)))
+  colnames(aovres) = cnames
+  rownames(aovres) = vars2use
+  aovres$compNames = vars2use
+  vars2loop = c(1:length(vars2use))
+
+  for (i in vars2loop) {
+  	y_var = vars2use[i]
+
+    # run analyses on Discovery and Replication datasets
+  	df_Disc = subset(df, df$dataset=="Discovery")
+    df_Rep = subset(df, df$dataset=="Replication")
+    
+    #--------------------------------------------------------------------------
+    # Discovery
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Disc,
+  	                              na.action = na.omit)))
+    df_Disc$data2plot = resid(mod2use)
+  
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Disc.BIC = BIC(mod2use)
+    
+  	DASD2 = subset(df_Disc, df_Disc$subgrp=="SC_over_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Disc.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Disc, df_Disc$subgrp=="RRB_over_SC" | df_Disc$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Disc_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Disc_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Disc.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Disc.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc.BIC = BIC(mod2use)
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.tstat"] = SCequalRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.pval"] = SCequalRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.AIC"] = SCequalRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.BIC"] = SCequalRRB_vs_TD_Disc.BIC
+
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.tstat"] = SCoverRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.pval"] = SCoverRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.AIC"] = SCoverRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.BIC"] = SCoverRRB_vs_TD_Disc.BIC
+
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.tstat"] = RRBoverSC_vs_TD_Disc_statistic
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.pval"] = RRBoverSC_vs_TD_Disc_p.value
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="RRB_over_SC"],
+    #                                          df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.AIC"] = RRBoverSC_vs_TD_Disc.AIC
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.BIC"] = RRBoverSC_vs_TD_Disc.BIC
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Disc.BIC
+
+    #--------------------------------------------------------------------------
+    # Replication
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Rep,
+  	                              na.action = na.omit)))
+    df_Rep$data2plot = resid(mod2use)
+
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  	DASD2 = subset(df_Rep, df_Rep$subgrp=="SC_over_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Rep, df_Rep$subgrp=="RRB_over_SC" | df_Rep$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Rep_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Rep_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Rep.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Rep.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep.BIC = BIC(mod2use)
+
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.tstat"] = SCequalRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.pval"] = SCequalRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.AIC"] = SCequalRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.BIC"] = SCequalRRB_vs_TD_Rep.BIC
+
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.tstat"] = SCoverRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.pval"] = SCoverRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.AIC"] = SCoverRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.BIC"] = SCoverRRB_vs_TD_Rep.BIC
+
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.tstat"] = RRBoverSC_vs_TD_Rep_statistic
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.pval"] = RRBoverSC_vs_TD_Rep_p.value
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="RRB_over_SC"],
+    #                                         df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.AIC"] = RRBoverSC_vs_TD_Rep.AIC
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.BIC"] = RRBoverSC_vs_TD_Rep.BIC
+    
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                             df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Rep.BIC
+
+    current_state = sprintf("Loop %d",i)
+    fname2save = file.path(resultpath,"anova_allconnections","monitor.csv")
+    write.table(current_state, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+  
+    #--------------------------------------------------------------------------
+    # compute replication Bayes Factors
+    res_bf = BFSALL(tobs = SCequalRRB_vs_TD_Disc_statistic, 
+                      trep = SCequalRRB_vs_TD_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="TD"), 
+                      m2 = sum(df_Rep$subgrp=="TD"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB.repBF"] = res_bf[4,2]
+  
+    res_bf = BFSALL(tobs = SCoverRRB_vs_TD_Disc_statistic, 
+                    trep = SCoverRRB_vs_TD_Rep_statistic,
+                    n1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                    n2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                    m1 = sum(df_Disc$subgrp=="TD"), 
+                    m2 = sum(df_Rep$subgrp=="TD"),
+                    sample = 2, 
+                    Type = 'ALL')
+    aovres[y_var,"SCoverRRB.repBF"] = res_bf[4,2]
+  
+    # # print("RRBoverSC")
+    # res_bf = BFSALL(tobs = RRBoverSC_vs_TD_Disc_statistic, 
+    #                 trep = RRBoverSC_vs_TD_Rep_statistic, 
+    #                 n1 = sum(df_Disc$subgrp=="RRB_over_SC"), 
+    #                 n2 = sum(df_Rep$subgrp=="RRB_over_SC"),
+    #                 m1 = sum(df_Disc$subgrp=="TD"), 
+    #                 m2 = sum(df_Rep$subgrp=="TD"),
+    #                 sample = 2,
+    #                 Type = 'ALL')
+    # aovres[y_var,"RRBoverSC.repBF"] = res_bf[4,2]
+    
+    res_bf = BFSALL(tobs = SCequalRRB_vs_SCoverRRB_Disc_statistic, 
+                      trep = SCequalRRB_vs_SCoverRRB_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                      m2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf[4,2]
+
+    # save results to a file
+    fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+    write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+  }
+  
+  mask1 = aovres$SCequalRRB.repBF>=10
+  mask2 = aovres$SCoverRRB.repBF>=10
+  # mask3 = aovres$RRBoverSC.repBF>=10
+  mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+  mask_allBF = mask1 | mask2 | mask4
+  print(aovres[mask_allBF,])
+  
+  # save results to a file
+  fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+  write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+} else {
+  
+  fname = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_z%s.xlsx",as.character(z_thresh)))
+  aovres = read_excel(fname)
+}
+
+mask1 = aovres$SCequalRRB.repBF>=10
+mask2 = aovres$SCoverRRB.repBF>=10
+# mask3 = aovres$RRBoverSC.repBF>=10
+mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+mask_allBF = mask1 | mask2 | mask4 
+
+aovres[mask_allBF,c("compNames","SCequalRRB.repBF","SCoverRRB.repBF")]
+
+#------------------------------------------------------------------------------
+# Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (aovres[comp_pair,"SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCequalRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCequalRRB_Rep_vs_TD.pval"]<0.05){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCoverRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCoverRRB_Rep_vs_TD.pval"]<0.05){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+}
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+```
+
+## Main analysis - Z = 0.8
+
+```{r, warning=FALSE, message=FALSE}
+# Z threshold
+z_thresh = 0.8
+
+fname = sprintf("partialCorData_ridge_lambda1.diffzscoreGrps_z%s.txt",as.character(z_thresh))
+
+fname2open = file.path(datapath, fname)
+df = read.delim(fname2open)
+df = subset(df,df$subgrp!="RRB_over_SC")
+
+tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
+tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
+
+asd_df = merge(tmp_df[,c("subid","A1_pct_severity","A2_pct_severity","A3_pct_severity",
+                        "B1_pct_severity","B2_pct_severity","B3_pct_severity","B4_pct_severity",
+                        "A_pct_severity","B_pct_severity","z_ds")],
+           df,
+           by="subid")
+
+vine_df = read.csv(here("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z1.csv"))
+
+asd_df = merge(asd_df, vine_df[,c("subid","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")], by = "subid")
+
+#------------------------------------------------------------------------------
+# Main analysis
+RUNANALYSIS = TRUE
+
+if (RUNANALYSIS==TRUE) {
+  
+  # columns with connectivity data
+  vars2use = colnames(df)[10:ncol(df)]
+  
+  cnames = c("compNames",
+             "SCequalRRB_Disc_vs_TD.tstat","SCequalRRB_Disc_vs_TD.pval", 
+             "SCequalRRB_Disc_vs_TD.es","SCequalRRB_Disc_vs_TD.AIC","SCequalRRB_Disc_vs_TD.BIC",
+             "SCequalRRB_Rep_vs_TD.tstat","SCequalRRB_Rep_vs_TD.pval","SCequalRRB_Rep_vs_TD.es", 
+             "SCequalRRB_Rep_vs_TD.AIC","SCequalRRB_Rep_vs_TD.BIC", "SCequalRRB.repBF",
+             "SCoverRRB_Disc_vs_TD.tstat","SCoverRRB_Disc_vs_TD.pval", 
+             "SCoverRRB_Disc_vs_TD.es","SCoverRRB_Disc_vs_TD.AIC","SCoverRRB_Disc_vs_TD.BIC",
+             "SCoverRRB_Rep_vs_TD.tstat","SCoverRRB_Rep_vs_TD.pval","SCoverRRB_Rep_vs_TD.es",
+             "SCoverRRB_Rep_vs_TD.AIC","SCoverRRB_Rep_vs_TD.BIC", "SCoverRRB.repBF",
+             "SCequalRRB_Disc_vs_SCoverRRB.tstat","SCequalRRB_Disc_vs_SCoverRRB.pval",
+             "SCequalRRB_Disc_vs_SCoverRRB.es","SCequalRRB_Disc_vs_SCoverRRB.AIC","SCequalRRB_Disc_vs_SCoverRRB.BIC",
+             "SCequalRRB_Rep_vs_SCoverRRB.tstat","SCequalRRB_Rep_vs_SCoverRRB.pval","SCequalRRB_Rep_vs_SCoverRRB.es",
+             "SCequalRRB_Rep_vs_SCoverRRB.AIC","SCequalRRB_Rep_vs_SCoverRRB.BIC","SCequalRRB_vs_SCoverRRB.repBF")
+  
+  aovres = data.frame(matrix(nrow = length(vars2use),ncol = length(cnames)))
+  colnames(aovres) = cnames
+  rownames(aovres) = vars2use
+  aovres$compNames = vars2use
+  vars2loop = c(1:length(vars2use))
+
+  for (i in vars2loop) {
+  	y_var = vars2use[i]
+
+    # run analyses on Discovery and Replication datasets
+  	df_Disc = subset(df, df$dataset=="Discovery")
+    df_Rep = subset(df, df$dataset=="Replication")
+    
+    #--------------------------------------------------------------------------
+    # Discovery
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Disc,
+  	                              na.action = na.omit)))
+    df_Disc$data2plot = resid(mod2use)
+  
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Disc.BIC = BIC(mod2use)
+    
+  	DASD2 = subset(df_Disc, df_Disc$subgrp=="SC_over_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Disc.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Disc, df_Disc$subgrp=="RRB_over_SC" | df_Disc$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Disc_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Disc_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Disc.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Disc.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc.BIC = BIC(mod2use)
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.tstat"] = SCequalRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.pval"] = SCequalRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.AIC"] = SCequalRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.BIC"] = SCequalRRB_vs_TD_Disc.BIC
+
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.tstat"] = SCoverRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.pval"] = SCoverRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.AIC"] = SCoverRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.BIC"] = SCoverRRB_vs_TD_Disc.BIC
+
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.tstat"] = RRBoverSC_vs_TD_Disc_statistic
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.pval"] = RRBoverSC_vs_TD_Disc_p.value
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="RRB_over_SC"],
+    #                                          df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.AIC"] = RRBoverSC_vs_TD_Disc.AIC
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.BIC"] = RRBoverSC_vs_TD_Disc.BIC
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Disc.BIC
+
+    #--------------------------------------------------------------------------
+    # Replication
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Rep,
+  	                              na.action = na.omit)))
+    df_Rep$data2plot = resid(mod2use)
+
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  	DASD2 = subset(df_Rep, df_Rep$subgrp=="SC_over_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Rep, df_Rep$subgrp=="RRB_over_SC" | df_Rep$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Rep_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Rep_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Rep.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Rep.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep.BIC = BIC(mod2use)
+
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.tstat"] = SCequalRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.pval"] = SCequalRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.AIC"] = SCequalRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.BIC"] = SCequalRRB_vs_TD_Rep.BIC
+
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.tstat"] = SCoverRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.pval"] = SCoverRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.AIC"] = SCoverRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.BIC"] = SCoverRRB_vs_TD_Rep.BIC
+
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.tstat"] = RRBoverSC_vs_TD_Rep_statistic
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.pval"] = RRBoverSC_vs_TD_Rep_p.value
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="RRB_over_SC"],
+    #                                         df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.AIC"] = RRBoverSC_vs_TD_Rep.AIC
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.BIC"] = RRBoverSC_vs_TD_Rep.BIC
+    
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                             df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Rep.BIC
+
+    current_state = sprintf("Loop %d",i)
+    fname2save = file.path(resultpath,"anova_allconnections","monitor.csv")
+    write.table(current_state, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+  
+    #--------------------------------------------------------------------------
+    # compute replication Bayes Factors
+    res_bf = BFSALL(tobs = SCequalRRB_vs_TD_Disc_statistic, 
+                      trep = SCequalRRB_vs_TD_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="TD"), 
+                      m2 = sum(df_Rep$subgrp=="TD"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB.repBF"] = res_bf[4,2]
+  
+    res_bf = BFSALL(tobs = SCoverRRB_vs_TD_Disc_statistic, 
+                    trep = SCoverRRB_vs_TD_Rep_statistic,
+                    n1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                    n2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                    m1 = sum(df_Disc$subgrp=="TD"), 
+                    m2 = sum(df_Rep$subgrp=="TD"),
+                    sample = 2, 
+                    Type = 'ALL')
+    aovres[y_var,"SCoverRRB.repBF"] = res_bf[4,2]
+  
+    # # print("RRBoverSC")
+    # res_bf = BFSALL(tobs = RRBoverSC_vs_TD_Disc_statistic, 
+    #                 trep = RRBoverSC_vs_TD_Rep_statistic, 
+    #                 n1 = sum(df_Disc$subgrp=="RRB_over_SC"), 
+    #                 n2 = sum(df_Rep$subgrp=="RRB_over_SC"),
+    #                 m1 = sum(df_Disc$subgrp=="TD"), 
+    #                 m2 = sum(df_Rep$subgrp=="TD"),
+    #                 sample = 2,
+    #                 Type = 'ALL')
+    # aovres[y_var,"RRBoverSC.repBF"] = res_bf[4,2]
+    
+    res_bf = BFSALL(tobs = SCequalRRB_vs_SCoverRRB_Disc_statistic, 
+                      trep = SCequalRRB_vs_SCoverRRB_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                      m2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf[4,2]
+
+    # save results to a file
+    fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+    write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+  }
+  
+  mask1 = aovres$SCequalRRB.repBF>=10
+  mask2 = aovres$SCoverRRB.repBF>=10
+  # mask3 = aovres$RRBoverSC.repBF>=10
+  mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+  mask_allBF = mask1 | mask2 | mask4
+  print(aovres[mask_allBF,])
+  
+  # save results to a file
+  fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+  write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+} else {
+  
+  fname = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_z%s.xlsx",as.character(z_thresh)))
+  aovres = read_excel(fname)
+}
+
+mask1 = aovres$SCequalRRB.repBF>=10
+mask2 = aovres$SCoverRRB.repBF>=10
+# mask3 = aovres$RRBoverSC.repBF>=10
+mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+mask_allBF = mask1 | mask2 | mask4 
+
+aovres[mask_allBF,c("compNames","SCequalRRB.repBF","SCoverRRB.repBF")]
+
+#------------------------------------------------------------------------------
+# Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (aovres[comp_pair,"SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCequalRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCequalRRB_Rep_vs_TD.pval"]<0.05){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCoverRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCoverRRB_Rep_vs_TD.pval"]<0.05){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+}
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+```
+
+## Main analysis - Z = 0.9
+
+```{r, warning=FALSE, message=FALSE}
+# Z threshold
+z_thresh = 0.9
+
+fname = sprintf("partialCorData_ridge_lambda1.diffzscoreGrps_z%s.txt",as.character(z_thresh))
+
+fname2open = file.path(datapath, fname)
+df = read.delim(fname2open)
+df = subset(df,df$subgrp!="RRB_over_SC")
+
+tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
+tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
+
+asd_df = merge(tmp_df[,c("subid","A1_pct_severity","A2_pct_severity","A3_pct_severity",
+                        "B1_pct_severity","B2_pct_severity","B3_pct_severity","B4_pct_severity",
+                        "A_pct_severity","B_pct_severity","z_ds")],
+           df,
+           by="subid")
+
+vine_df = read.csv(here("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z1.csv"))
+
+asd_df = merge(asd_df, vine_df[,c("subid","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")], by = "subid")
+
+#------------------------------------------------------------------------------
+# Main analysis
+RUNANALYSIS = TRUE
+
+if (RUNANALYSIS==TRUE) {
+  
+  # columns with connectivity data
+  vars2use = colnames(df)[10:ncol(df)]
+  
+  cnames = c("compNames",
+             "SCequalRRB_Disc_vs_TD.tstat","SCequalRRB_Disc_vs_TD.pval", 
+             "SCequalRRB_Disc_vs_TD.es","SCequalRRB_Disc_vs_TD.AIC","SCequalRRB_Disc_vs_TD.BIC",
+             "SCequalRRB_Rep_vs_TD.tstat","SCequalRRB_Rep_vs_TD.pval","SCequalRRB_Rep_vs_TD.es", 
+             "SCequalRRB_Rep_vs_TD.AIC","SCequalRRB_Rep_vs_TD.BIC", "SCequalRRB.repBF",
+             "SCoverRRB_Disc_vs_TD.tstat","SCoverRRB_Disc_vs_TD.pval", 
+             "SCoverRRB_Disc_vs_TD.es","SCoverRRB_Disc_vs_TD.AIC","SCoverRRB_Disc_vs_TD.BIC",
+             "SCoverRRB_Rep_vs_TD.tstat","SCoverRRB_Rep_vs_TD.pval","SCoverRRB_Rep_vs_TD.es",
+             "SCoverRRB_Rep_vs_TD.AIC","SCoverRRB_Rep_vs_TD.BIC", "SCoverRRB.repBF",
+             "SCequalRRB_Disc_vs_SCoverRRB.tstat","SCequalRRB_Disc_vs_SCoverRRB.pval",
+             "SCequalRRB_Disc_vs_SCoverRRB.es","SCequalRRB_Disc_vs_SCoverRRB.AIC","SCequalRRB_Disc_vs_SCoverRRB.BIC",
+             "SCequalRRB_Rep_vs_SCoverRRB.tstat","SCequalRRB_Rep_vs_SCoverRRB.pval","SCequalRRB_Rep_vs_SCoverRRB.es",
+             "SCequalRRB_Rep_vs_SCoverRRB.AIC","SCequalRRB_Rep_vs_SCoverRRB.BIC","SCequalRRB_vs_SCoverRRB.repBF")
+  
+  aovres = data.frame(matrix(nrow = length(vars2use),ncol = length(cnames)))
+  colnames(aovres) = cnames
+  rownames(aovres) = vars2use
+  aovres$compNames = vars2use
+  vars2loop = c(1:length(vars2use))
+
+  for (i in vars2loop) {
+  	y_var = vars2use[i]
+
+    # run analyses on Discovery and Replication datasets
+  	df_Disc = subset(df, df$dataset=="Discovery")
+    df_Rep = subset(df, df$dataset=="Replication")
+    
+    #--------------------------------------------------------------------------
+    # Discovery
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Disc,
+  	                              na.action = na.omit)))
+    df_Disc$data2plot = resid(mod2use)
+  
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Disc.BIC = BIC(mod2use)
+    
+  	DASD2 = subset(df_Disc, df_Disc$subgrp=="SC_over_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Disc.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Disc, df_Disc$subgrp=="RRB_over_SC" | df_Disc$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Disc_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Disc_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Disc.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Disc.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc.BIC = BIC(mod2use)
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.tstat"] = SCequalRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.pval"] = SCequalRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.AIC"] = SCequalRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.BIC"] = SCequalRRB_vs_TD_Disc.BIC
+
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.tstat"] = SCoverRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.pval"] = SCoverRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.AIC"] = SCoverRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.BIC"] = SCoverRRB_vs_TD_Disc.BIC
+
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.tstat"] = RRBoverSC_vs_TD_Disc_statistic
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.pval"] = RRBoverSC_vs_TD_Disc_p.value
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="RRB_over_SC"],
+    #                                          df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.AIC"] = RRBoverSC_vs_TD_Disc.AIC
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.BIC"] = RRBoverSC_vs_TD_Disc.BIC
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Disc.BIC
+
+    #--------------------------------------------------------------------------
+    # Replication
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Rep,
+  	                              na.action = na.omit)))
+    df_Rep$data2plot = resid(mod2use)
+
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  	DASD2 = subset(df_Rep, df_Rep$subgrp=="SC_over_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Rep, df_Rep$subgrp=="RRB_over_SC" | df_Rep$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Rep_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Rep_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Rep.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Rep.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep.BIC = BIC(mod2use)
+
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.tstat"] = SCequalRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.pval"] = SCequalRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.AIC"] = SCequalRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.BIC"] = SCequalRRB_vs_TD_Rep.BIC
+
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.tstat"] = SCoverRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.pval"] = SCoverRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.AIC"] = SCoverRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.BIC"] = SCoverRRB_vs_TD_Rep.BIC
+
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.tstat"] = RRBoverSC_vs_TD_Rep_statistic
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.pval"] = RRBoverSC_vs_TD_Rep_p.value
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="RRB_over_SC"],
+    #                                         df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.AIC"] = RRBoverSC_vs_TD_Rep.AIC
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.BIC"] = RRBoverSC_vs_TD_Rep.BIC
+    
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                             df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Rep.BIC
+
+    current_state = sprintf("Loop %d",i)
+    fname2save = file.path(resultpath,"anova_allconnections","monitor.csv")
+    write.table(current_state, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+  
+    #--------------------------------------------------------------------------
+    # compute replication Bayes Factors
+    res_bf = BFSALL(tobs = SCequalRRB_vs_TD_Disc_statistic, 
+                      trep = SCequalRRB_vs_TD_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="TD"), 
+                      m2 = sum(df_Rep$subgrp=="TD"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB.repBF"] = res_bf[4,2]
+  
+    res_bf = BFSALL(tobs = SCoverRRB_vs_TD_Disc_statistic, 
+                    trep = SCoverRRB_vs_TD_Rep_statistic,
+                    n1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                    n2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                    m1 = sum(df_Disc$subgrp=="TD"), 
+                    m2 = sum(df_Rep$subgrp=="TD"),
+                    sample = 2, 
+                    Type = 'ALL')
+    aovres[y_var,"SCoverRRB.repBF"] = res_bf[4,2]
+  
+    # # print("RRBoverSC")
+    # res_bf = BFSALL(tobs = RRBoverSC_vs_TD_Disc_statistic, 
+    #                 trep = RRBoverSC_vs_TD_Rep_statistic, 
+    #                 n1 = sum(df_Disc$subgrp=="RRB_over_SC"), 
+    #                 n2 = sum(df_Rep$subgrp=="RRB_over_SC"),
+    #                 m1 = sum(df_Disc$subgrp=="TD"), 
+    #                 m2 = sum(df_Rep$subgrp=="TD"),
+    #                 sample = 2,
+    #                 Type = 'ALL')
+    # aovres[y_var,"RRBoverSC.repBF"] = res_bf[4,2]
+    
+    res_bf = BFSALL(tobs = SCequalRRB_vs_SCoverRRB_Disc_statistic, 
+                      trep = SCequalRRB_vs_SCoverRRB_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                      m2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf[4,2]
+
+    # save results to a file
+    fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+    write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+  }
+  
+  mask1 = aovres$SCequalRRB.repBF>=10
+  mask2 = aovres$SCoverRRB.repBF>=10
+  # mask3 = aovres$RRBoverSC.repBF>=10
+  mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+  mask_allBF = mask1 | mask2 | mask4
+  print(aovres[mask_allBF,])
+  
+  # save results to a file
+  fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+  write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+} else {
+  
+  fname = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_z%s.xlsx",as.character(z_thresh)))
+  aovres = read_excel(fname)
+}
+
+mask1 = aovres$SCequalRRB.repBF>=10
+mask2 = aovres$SCoverRRB.repBF>=10
+# mask3 = aovres$RRBoverSC.repBF>=10
+mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+mask_allBF = mask1 | mask2 | mask4 
+
+aovres[mask_allBF,c("compNames","SCequalRRB.repBF","SCoverRRB.repBF")]
+
+#------------------------------------------------------------------------------
+# Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (aovres[comp_pair,"SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCequalRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCequalRRB_Rep_vs_TD.pval"]<0.05){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCoverRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCoverRRB_Rep_vs_TD.pval"]<0.05){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+}
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+```
+
+## Main analysis - Z = 1
+
+```{r, warning=FALSE, message=FALSE}
+# Z threshold
+z_thresh = 1
+
+fname = sprintf("partialCorData_ridge_lambda1.diffzscoreGrps_z%s.txt",as.character(z_thresh))
+
+fname2open = file.path(datapath, fname)
+df = read.delim(fname2open)
+df = subset(df,df$subgrp!="RRB_over_SC")
+
+tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
+tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
+tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
+tmp_df$AB_pct_severity = tmp_df$A_pct_severity + tmp_df$B_pct_severity 
+
+asd_df = merge(tmp_df[,c("subid","A1_pct_severity","A2_pct_severity","A3_pct_severity",
+                        "B1_pct_severity","B2_pct_severity","B3_pct_severity","B4_pct_severity",
+                        "A_pct_severity","B_pct_severity","AB_pct_severity","z_ds")],
+           df,
+           by="subid")
+
+vine_df = read.csv(here("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z1.csv"))
+
+asd_df = merge(asd_df, vine_df[,c("subid","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")], by = "subid")
+
+#------------------------------------------------------------------------------
+# Main analysis
+RUNANALYSIS = TRUE
+
+if (RUNANALYSIS==TRUE) {
+  
+  # columns with connectivity data
+  vars2use = colnames(df)[10:ncol(df)]
+  
+  cnames = c("compNames",
+             "SCequalRRB_Disc_vs_TD.tstat","SCequalRRB_Disc_vs_TD.pval", 
+             "SCequalRRB_Disc_vs_TD.es","SCequalRRB_Disc_vs_TD.AIC","SCequalRRB_Disc_vs_TD.BIC",
+             "SCequalRRB_Rep_vs_TD.tstat","SCequalRRB_Rep_vs_TD.pval","SCequalRRB_Rep_vs_TD.es", 
+             "SCequalRRB_Rep_vs_TD.AIC","SCequalRRB_Rep_vs_TD.BIC", "SCequalRRB.repBF",
+             "SCoverRRB_Disc_vs_TD.tstat","SCoverRRB_Disc_vs_TD.pval", 
+             "SCoverRRB_Disc_vs_TD.es","SCoverRRB_Disc_vs_TD.AIC","SCoverRRB_Disc_vs_TD.BIC",
+             "SCoverRRB_Rep_vs_TD.tstat","SCoverRRB_Rep_vs_TD.pval","SCoverRRB_Rep_vs_TD.es",
+             "SCoverRRB_Rep_vs_TD.AIC","SCoverRRB_Rep_vs_TD.BIC", "SCoverRRB.repBF",
+             "SCequalRRB_Disc_vs_SCoverRRB.tstat","SCequalRRB_Disc_vs_SCoverRRB.pval",
+             "SCequalRRB_Disc_vs_SCoverRRB.es","SCequalRRB_Disc_vs_SCoverRRB.AIC",
+             "SCequalRRB_Disc_vs_SCoverRRB.BIC",
+             "SCequalRRB_Rep_vs_SCoverRRB.tstat","SCequalRRB_Rep_vs_SCoverRRB.pval",
+             "SCequalRRB_Rep_vs_SCoverRRB.es",
+             "SCequalRRB_Rep_vs_SCoverRRB.AIC","SCequalRRB_Rep_vs_SCoverRRB.BIC",
+             "SCequalRRB_vs_SCoverRRB.repBF",
+             "SCcorr_Disc.r","SCcorr_Disc.t","SCcorr_Disc.pval",
+             "SCcorr_Rep.r","SCcorr_Rep.t","SCcorr_Rep.pval","SCcorr.repBF",
+             "RRBcorr_Disc.r","RRBcorr_Disc.t","RRBcorr_Disc.pval",
+             "RRBcorr_Rep.r","RRBcorr_Rep.t","RRBcorr_Rep.pval","RRBcorr.repBF",
+             "SumSCRRB_Disc.r","SumSCRRB_Disc.t","SumSCRRB_Disc.pval",
+             "SumSCRRB_Rep.r","SumSCRRB_Rep.t","SumSCRRB_Rep.pval","SumSCRRB.repBF",
+             "zds_Disc.r","zds_Disc.t","zds_Disc.pval",
+             "zds_Rep.r","zds_Rep.t","zds_Rep.pval","zds.repBF",
+             "SumSCRRB_SCequalRRB_Disc.r","SumSCRRB_SCequalRRB_Disc.t","SumSCRRB_SCequalRRB_Disc.pval",
+             "SumSCRRB_SCequalRRB_Rep.r","SumSCRRB_SCequalRRB_Rep.t",
+             "SumSCRRB_SCequalRRB_Rep.pval","SumSCRRB_SCequalRRB.repBF",
+             "zds_SCequalRRB_Disc.r","zds_SCequalRRB_Disc.t","zds_SCequalRRB_Disc.pval",
+             "zds_SCequalRRB_Rep.r","zds_SCequalRRB_Rep.t","zds_SCequalRRB_Rep.pval","zds_SCequalRRB.repBF",
+             "zds_SCoverRRB_Disc.r","zds_SCoverRRB_Disc.t","zds_SCoverRRB_Disc.pval",
+             "zds_SCoverRRB_Rep.r","zds_SCoverRRB_Rep.t","zds_SCoverRRB_Rep.pval","zds_SCoverRRB.repBF",
+             "VinelandABC_Disc.r","VinelandABC_Disc.t","VinelandABC_Disc.pval",
+             "VinelandABC_Rep.r","VinelandABC_Rep.t",
+             "VinelandABC_Rep.pval","VinelandABC.repBF",
+             "VinelandABC_SCequalRRB_Disc.r","VinelandABC_SCequalRRB_Disc.t","VinelandABC_SCequalRRB_Disc.pval",
+             "VinelandABC_SCequalRRB_Rep.r","VinelandABC_SCequalRRB_Rep.t",
+             "VinelandABC_SCequalRRB_Rep.pval","VinelandABC_SCequalRRB.repBF",
+             "VinelandABC_SCoverRRB_Disc.r","VinelandABC_SCoverRRB_Disc.t","VinelandABC_SCoverRRB_Disc.pval",
+             "VinelandABC_SCoverRRB_Rep.r","VinelandABC_SCoverRRB_Rep.t",
+             "VinelandABC_SCoverRRB_Rep.pval","VinelandABC_SCoverRRB.repBF")
+  
+  
+  # "vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard"
+  
+  aovres = data.frame(matrix(nrow = length(vars2use),ncol = length(cnames)))
+  colnames(aovres) = cnames
+  rownames(aovres) = vars2use
+  aovres$compNames = vars2use
+  vars2loop = c(1:length(vars2use))
+
+  for (i in vars2loop) {
+  	y_var = vars2use[i]
+
+    # run analyses on Discovery and Replication datasets
+  	df_Disc = subset(df, df$dataset=="Discovery")
+    df_Rep = subset(df, df$dataset=="Replication")
+
+    #--------------------------------------------------------------------------
+    # Discovery
+    
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Disc,
+  	                              na.action = na.omit)))
+    df_Disc$data2plot = resid(mod2use)
+  
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Disc.BIC = BIC(mod2use)
+    
+  	DASD2 = subset(df_Disc, df_Disc$subgrp=="SC_over_RRB" | df_Disc$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Disc_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Disc_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Disc.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Disc.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Disc, df_Disc$subgrp=="RRB_over_SC" | df_Disc$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Disc_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Disc_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Disc.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Disc.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Disc, df_Disc$subgrp=="SC_equal_RRB" | df_Disc$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Disc_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Disc.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Disc.BIC = BIC(mod2use)
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.tstat"] = SCequalRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.pval"] = SCequalRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.AIC"] = SCequalRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_TD.BIC"] = SCequalRRB_vs_TD_Disc.BIC
+
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.tstat"] = SCoverRRB_vs_TD_Disc_statistic
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.pval"] = SCoverRRB_vs_TD_Disc_p.value
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.AIC"] = SCoverRRB_vs_TD_Disc.AIC
+    aovres[y_var,"SCoverRRB_Disc_vs_TD.BIC"] = SCoverRRB_vs_TD_Disc.BIC
+
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.tstat"] = RRBoverSC_vs_TD_Disc_statistic
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.pval"] = RRBoverSC_vs_TD_Disc_p.value
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="RRB_over_SC"],
+    #                                          df_Disc$data2plot[df_Disc$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.AIC"] = RRBoverSC_vs_TD_Disc.AIC
+    # aovres[y_var,"RRBoverSC_Disc_vs_TD.BIC"] = RRBoverSC_vs_TD_Disc.BIC
+    
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Disc_statistic
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Disc_p.value
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.es"] = cohens_d(df_Disc$data2plot[df_Disc$subgrp=="SC_equal_RRB"],
+                                             df_Disc$data2plot[df_Disc$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Disc.AIC
+    aovres[y_var,"SCequalRRB_Disc_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Disc.BIC
+
+    
+    #--------------------------------------------------------------------------
+    DASD = subset(asd_df, asd_df$dataset=="Discovery")
+    DASD$site = factor(DASD$site)
+    
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"A_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"SCcorr_Disc.t"] = res$tTable["A_pct_severity","t-value"]
+  	aovres[y_var,"SCcorr_Disc.pval"] = res$tTable["A_pct_severity","p-value"]
+  	
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"A_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ A_pct_severity + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$A_pct_severity)
+    aovres[y_var,"SCcorr_Disc.r"] = res$estimate
+
+    
+    
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"B_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"RRBcorr_Disc.t"] = res$tTable["B_pct_severity","t-value"]
+  	aovres[y_var,"RRBcorr_Disc.pval"] = res$tTable["B_pct_severity","p-value"]
+
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"B_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ B_pct_severity + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$B_pct_severity)
+    aovres[y_var,"RRBcorr_Disc.r"] = res$estimate
+
+  	
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"SumSCRRB_Disc.t"] = res$tTable["AB_pct_severity","t-value"]
+  	aovres[y_var,"SumSCRRB_Disc.pval"] = res$tTable["AB_pct_severity","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ AB_pct_severity + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$AB_pct_severity)
+    aovres[y_var,"SumSCRRB_Disc.r"] = res$estimate
+
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"z_ds","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"zds_Disc.t"] = res$tTable["z_ds","t-value"]
+  	aovres[y_var,"zds_Disc.pval"] = res$tTable["z_ds","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"z_ds","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ z_ds + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$z_ds)
+    aovres[y_var,"zds_Disc.r"] = res$estimate
+    
+    
+    # Vineland ABC
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"VinelandABC_Disc.t"] = res$tTable["vabsabcabc_standard","t-value"]
+  	aovres[y_var,"VinelandABC_Disc.pval"] = res$tTable["vabsabcabc_standard","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ vabsabcabc_standard + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$vabsabcabc_standard)
+    aovres[y_var,"VinelandABC_Disc.r"] = res$estimate
+    
+    
+    
+    DASD_SCequalRRB = subset(DASD,DASD$subgrp=="SC_equal_RRB")
+    DASD_SCoverRRB = subset(DASD,DASD$subgrp=="SC_over_RRB")
+
+
+    # Vineland ABC
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCequalRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"VinelandABC_SCequalRRB_Disc.t"] = res$tTable["vabsabcabc_standard","t-value"]
+  	aovres[y_var,"VinelandABC_SCequalRRB_Disc.pval"] = res$tTable["vabsabcabc_standard","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCequalRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ vabsabcabc_standard + sex + scan_age + site, data=DASD_SCequalRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCequalRRB$covadj = as.numeric(t(DASD_SCequalRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCequalRRB$covadj,DASD_SCequalRRB$vabsabcabc_standard)
+    aovres[y_var,"VinelandABC_SCequalRRB_Disc.r"] = res$estimate
+    
+    
+    # Vineland ABC
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCoverRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"VinelandABC_SCoverRRB_Disc.t"] = res$tTable["vabsabcabc_standard","t-value"]
+  	aovres[y_var,"VinelandABC_SCoverRRB_Disc.pval"] = res$tTable["vabsabcabc_standard","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCoverRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ vabsabcabc_standard + sex + scan_age + site, data=DASD_SCoverRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCoverRRB$covadj = as.numeric(t(DASD_SCoverRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCoverRRB$covadj,DASD_SCoverRRB$vabsabcabc_standard)
+    aovres[y_var,"VinelandABC_SCoverRRB_Disc.r"] = res$estimate
+    
+    
+
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCequalRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"SumSCRRB_SCequalRRB_Disc.t"] = res$tTable["AB_pct_severity","t-value"]
+  	aovres[y_var,"SumSCRRB_SCequalRRB_Disc.pval"] = res$tTable["AB_pct_severity","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCequalRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ AB_pct_severity + sex + scan_age + site, data=DASD_SCequalRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCequalRRB$covadj = as.numeric(t(DASD_SCequalRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCequalRRB$covadj,DASD_SCequalRRB$AB_pct_severity)
+    aovres[y_var,"SumSCRRB_SCequalRRB_Disc.r"] = res$estimate
+    
+    
+            
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"z_ds","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCequalRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"zds_SCequalRRB_Disc.t"] = res$tTable["z_ds","t-value"]
+  	aovres[y_var,"zds_SCequalRRB_Disc.pval"] = res$tTable["z_ds","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"z_ds","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCequalRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ z_ds + sex + scan_age + site, data=DASD_SCequalRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCequalRRB$covadj = as.numeric(t(DASD_SCequalRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCequalRRB$covadj,DASD_SCequalRRB$z_ds)
+    aovres[y_var,"zds_SCequalRRB_Disc.r"] = res$estimate
+    
+  
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"z_ds","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCoverRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"zds_SCoverRRB_Disc.t"] = res$tTable["z_ds","t-value"]
+  	aovres[y_var,"zds_SCoverRRB_Disc.pval"] = res$tTable["z_ds","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"z_ds","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCoverRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ z_ds + sex + scan_age + site, data=DASD_SCoverRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCoverRRB$covadj = as.numeric(t(DASD_SCoverRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCoverRRB$covadj,DASD_SCoverRRB$z_ds)
+    aovres[y_var,"zds_SCoverRRB_Disc.r"] = res$estimate
+      
+  # 	res = cor.test(DASD[,"A_pct_severity"],DASD[,y_var])
+  #   aovres[y_var,"SCcorr_Disc.r"] = res$estimate
+  #   aovres[y_var,"SCcorr_Disc.pval"] = res$p.value
+  # 	res = cor.test(DASD[,"B_pct_severity"],DASD[,y_var])
+  #   aovres[y_var,"RRBcorr_Disc.r"] = res$estimate
+  #   aovres[y_var,"RRBcorr_Disc.pval"] = res$p.value
+  # 	res = cor.test(DASD[,"AB_pct_severity"],DASD[,y_var])
+  #   aovres[y_var,"SumSCRRB_Disc.r"] = res$estimate
+  #   aovres[y_var,"SumSCRRB_Disc.pval"] = res$p.value
+    n_orig = dim(DASD)[1]
+    #--------------------------------------------------------------------------
+    
+    
+    #--------------------------------------------------------------------------
+    # Replication
+
+  	# grab residuals after accounting for sex and scan_age
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s",y_var,"sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = df_Rep,
+  	                              na.action = na.omit)))
+    df_Rep$data2plot = resid(mod2use)
+
+    # compute t-stats
+    fx_form = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"subgrp","sex","scan_age"))
+  	rx_form = as.formula(sprintf("~ 1|%s","site"))
+  	
+  	DASD1 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD1, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  	DASD2 = subset(df_Rep, df_Rep$subgrp=="SC_over_RRB" | df_Rep$subgrp=="TD")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD2, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCoverRRB_vs_TD_Rep_statistic = res$tTable[2,4]
+    SCoverRRB_vs_TD_Rep_p.value = res$tTable[2,5]
+    SCoverRRB_vs_TD_Rep.AIC = AIC(mod2use)
+    SCoverRRB_vs_TD_Rep.BIC = BIC(mod2use)
+
+  # 	DASD3 = subset(df_Rep, df_Rep$subgrp=="RRB_over_SC" | df_Rep$subgrp=="TD")
+  # 	mod2use = eval(substitute(lme(fixed = fx_form, 
+  # 	                              random = rx_form, 
+  # 	                              data = DASD3, 
+  # 	                              na.action = na.omit)))
+  #   res = summary(mod2use)
+  #   RRBoverSC_vs_TD_Rep_statistic = res$tTable[2,4]
+  #   RRBoverSC_vs_TD_Rep_p.value = res$tTable[2,5]
+  #   RRBoverSC_vs_TD_Rep.AIC = AIC(mod2use)
+  #   RRBoverSC_vs_TD_Rep.BIC = BIC(mod2use)
+    
+    DASD4 = subset(df_Rep, df_Rep$subgrp=="SC_equal_RRB" | df_Rep$subgrp=="SC_over_RRB")
+  	mod2use = eval(substitute(lme(fixed = fx_form, 
+  	                              random = rx_form, 
+  	                              data = DASD4, 
+  	                              na.action = na.omit)))
+    res = summary(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep_statistic = res$tTable[2,4]
+    SCequalRRB_vs_SCoverRRB_Rep_p.value = res$tTable[2,5]
+    SCequalRRB_vs_SCoverRRB_Rep.AIC = AIC(mod2use)
+    SCequalRRB_vs_SCoverRRB_Rep.BIC = BIC(mod2use)
+
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.tstat"] = SCequalRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.pval"] = SCequalRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.AIC"] = SCequalRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_TD.BIC"] = SCequalRRB_vs_TD_Rep.BIC
+
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.tstat"] = SCoverRRB_vs_TD_Rep_statistic
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.pval"] = SCoverRRB_vs_TD_Rep_p.value
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"],
+                                            df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.AIC"] = SCoverRRB_vs_TD_Rep.AIC
+    aovres[y_var,"SCoverRRB_Rep_vs_TD.BIC"] = SCoverRRB_vs_TD_Rep.BIC
+
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.tstat"] = RRBoverSC_vs_TD_Rep_statistic
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.pval"] = RRBoverSC_vs_TD_Rep_p.value
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="RRB_over_SC"],
+    #                                         df_Rep$data2plot[df_Rep$subgrp=="TD"])
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.AIC"] = RRBoverSC_vs_TD_Rep.AIC
+    # aovres[y_var,"RRBoverSC_Rep_vs_TD.BIC"] = RRBoverSC_vs_TD_Rep.BIC
+    
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.tstat"] = SCequalRRB_vs_SCoverRRB_Rep_statistic
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.pval"] = SCequalRRB_vs_SCoverRRB_Rep_p.value
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.es"] = cohens_d(df_Rep$data2plot[df_Rep$subgrp=="SC_equal_RRB"],
+                                             df_Rep$data2plot[df_Rep$subgrp=="SC_over_RRB"])
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.AIC"] = SCequalRRB_vs_SCoverRRB_Rep.AIC
+    aovres[y_var,"SCequalRRB_Rep_vs_SCoverRRB.BIC"] = SCequalRRB_vs_SCoverRRB_Rep.BIC
+    
+    
+    #--------------------------------------------------------------------------
+    DASD = subset(asd_df, asd_df$dataset=="Replication")
+    DASD$site = factor(DASD$site)
+    
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"A_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"SCcorr_Rep.t"] = res$tTable["A_pct_severity","t-value"]
+  	aovres[y_var,"SCcorr_Rep.pval"] = res$tTable["A_pct_severity","p-value"]
+  	
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"A_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ A_pct_severity + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$A_pct_severity)
+    aovres[y_var,"SCcorr_Rep.r"] = res$estimate
+
+    
+    
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"B_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"RRBcorr_Rep.t"] = res$tTable["B_pct_severity","t-value"]
+  	aovres[y_var,"RRBcorr_Rep.pval"] = res$tTable["B_pct_severity","p-value"]
+
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"B_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ B_pct_severity + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$B_pct_severity)
+    aovres[y_var,"RRBcorr_Rep.r"] = res$estimate
+
+  	
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"SumSCRRB_Rep.t"] = res$tTable["AB_pct_severity","t-value"]
+  	aovres[y_var,"SumSCRRB_Rep.pval"] = res$tTable["AB_pct_severity","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ AB_pct_severity + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$AB_pct_severity)
+    aovres[y_var,"SumSCRRB_Rep.r"] = res$estimate
+    
+    
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"z_ds","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"zds_Rep.t"] = res$tTable["z_ds","t-value"]
+  	aovres[y_var,"zds_Rep.pval"] = res$tTable["z_ds","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"z_ds","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ z_ds + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$z_ds)
+    aovres[y_var,"zds_Rep.r"] = res$estimate
+    
+    
+    # Vineland ABC
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"VinelandABC_Rep.t"] = res$tTable["vabsabcabc_standard","t-value"]
+  	aovres[y_var,"VinelandABC_Rep.pval"] = res$tTable["vabsabcabc_standard","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ vabsabcabc_standard + sex + scan_age + site, data=DASD)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD$covadj = as.numeric(t(DASD[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD$covadj,DASD$vabsabcabc_standard)
+    aovres[y_var,"VinelandABC_Rep.r"] = res$estimate
+    
+    
+    DASD_SCequalRRB = subset(DASD,DASD$subgrp=="SC_equal_RRB")
+    DASD_SCoverRRB = subset(DASD,DASD$subgrp=="SC_over_RRB")
+
+    
+    # Vineland ABC
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCequalRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"VinelandABC_SCequalRRB_Rep.t"] = res$tTable["vabsabcabc_standard","t-value"]
+  	aovres[y_var,"VinelandABC_SCequalRRB_Rep.pval"] = res$tTable["vabsabcabc_standard","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCequalRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ vabsabcabc_standard + sex + scan_age + site, data=DASD_SCequalRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCequalRRB$covadj = as.numeric(t(DASD_SCequalRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCequalRRB$covadj,DASD_SCequalRRB$vabsabcabc_standard)
+    aovres[y_var,"VinelandABC_SCequalRRB_Rep.r"] = res$estimate
+    
+    
+    # Vineland ABC
+    fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCoverRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"VinelandABC_SCoverRRB_Rep.t"] = res$tTable["vabsabcabc_standard","t-value"]
+  	aovres[y_var,"VinelandABC_SCoverRRB_Rep.pval"] = res$tTable["vabsabcabc_standard","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"vabsabcabc_standard","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCoverRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ vabsabcabc_standard + sex + scan_age + site, data=DASD_SCoverRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCoverRRB$covadj = as.numeric(t(DASD_SCoverRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCoverRRB$covadj,DASD_SCoverRRB$vabsabcabc_standard)
+    aovres[y_var,"VinelandABC_SCoverRRB_Rep.r"] = res$estimate    
+    
+    
+    
+
+    
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCequalRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"SumSCRRB_SCequalRRB_Rep.t"] = res$tTable["AB_pct_severity","t-value"]
+  	aovres[y_var,"SumSCRRB_SCequalRRB_Rep.pval"] = res$tTable["AB_pct_severity","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"AB_pct_severity","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCequalRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ AB_pct_severity + sex + scan_age + site, data=DASD_SCequalRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCequalRRB$covadj = as.numeric(t(DASD_SCequalRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCequalRRB$covadj,DASD_SCequalRRB$AB_pct_severity)
+    aovres[y_var,"SumSCRRB_SCequalRRB_Rep.r"] = res$estimate
+
+            
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"z_ds","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCequalRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"zds_SCequalRRB_Rep.t"] = res$tTable["z_ds","t-value"]
+  	aovres[y_var,"zds_SCequalRRB_Rep.pval"] = res$tTable["z_ds","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"z_ds","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCequalRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ z_ds + sex + scan_age + site, data=DASD_SCequalRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCequalRRB$covadj = as.numeric(t(DASD_SCequalRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCequalRRB$covadj,DASD_SCequalRRB$z_ds)
+    aovres[y_var,"zds_SCequalRRB_Rep.r"] = res$estimate
+    
+  
+  	fx_form2 = as.formula(sprintf("%s ~ %s + %s + %s",y_var,"z_ds","sex","scan_age"))
+  	mod2use = eval(substitute(lme(fixed = fx_form2,
+  	                              random = rx_form,
+  	                              data = DASD_SCoverRRB,
+  	                              na.action = na.omit)))
+  	res = summary(mod2use)
+  	aovres[y_var,"zds_SCoverRRB_Rep.t"] = res$tTable["z_ds","t-value"]
+  	aovres[y_var,"zds_SCoverRRB_Rep.pval"] = res$tTable["z_ds","p-value"]
+    
+    lm_form = as.formula(sprintf("%s ~ %s + %s + %s + %s",y_var,"z_ds","sex","scan_age","site"))
+  	lm_mod = lm(formula=lm_form, data = DASD_SCoverRRB, na.action = na.omit)
+		covname2use = c("sexMale","scan_age", "sitekcl","sitenijmegen","siteutrecht")
+  	beta1 = lm_mod$coefficients[covname2use, drop = FALSE]
+  	beta1[is.na(beta1)] = 0
+  	full_model = model.matrix(~0+ z_ds + sex + scan_age + site, data=DASD_SCoverRRB)
+  	covname2use = c("sexMale","scan_age","sitekcl","sitenijmegen","siteutrecht")
+  	DASD_SCoverRRB$covadj = as.numeric(t(DASD_SCoverRRB[,y_var] - beta1 %*% t(full_model[,covname2use])))
+    res = cor.test(DASD_SCoverRRB$covadj,DASD_SCoverRRB$z_ds)
+    aovres[y_var,"zds_SCoverRRB_Rep.r"] = res$estimate
+      
+    
+  # 	res = cor.test(DASD[,"A_pct_severity"],DASD[,y_var])
+  #   aovres[y_var,"SCcorr_Rep.r"] = res$estimate
+  #   aovres[y_var,"SCcorr_Rep.pval"] = res$p.value
+  # 	res = cor.test(DASD[,"B_pct_severity"],DASD[,y_var])
+  #   aovres[y_var,"RRBcorr_Rep.r"] = res$estimate
+  #   aovres[y_var,"RRBcorr_Rep.pval"] = res$p.value
+  # 	res = cor.test(DASD[,"AB_pct_severity"],DASD[,y_var])
+  #   aovres[y_var,"SumSCRRB_Rep.r"] = res$estimate
+  #   aovres[y_var,"SumSCRRB_Rep.pval"] = res$p.value
+    n_rep = dim(DASD)[1]
+    #--------------------------------------------------------------------------
+
+
+    current_state = sprintf("Loop %d",i)
+    fname2save = file.path(resultpath,"anova_allconnections","monitor.csv")
+    write.table(current_state, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+    #--------------------------------------------------------------------------
+    # compute replication Bayes Factors  
+    res_bf = BFSALL(tobs = SCequalRRB_vs_TD_Disc_statistic, 
+                      trep = SCequalRRB_vs_TD_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="TD"), 
+                      m2 = sum(df_Rep$subgrp=="TD"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB.repBF"] = res_bf[4,2]
+  
+    res_bf = BFSALL(tobs = SCoverRRB_vs_TD_Disc_statistic, 
+                    trep = SCoverRRB_vs_TD_Rep_statistic,
+                    n1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                    n2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                    m1 = sum(df_Disc$subgrp=="TD"), 
+                    m2 = sum(df_Rep$subgrp=="TD"),
+                    sample = 2, 
+                    Type = 'ALL')
+    aovres[y_var,"SCoverRRB.repBF"] = res_bf[4,2]
+  
+    # # print("RRBoverSC")
+    # res_bf = BFSALL(tobs = RRBoverSC_vs_TD_Disc_statistic, 
+    #                 trep = RRBoverSC_vs_TD_Rep_statistic, 
+    #                 n1 = sum(df_Disc$subgrp=="RRB_over_SC"), 
+    #                 n2 = sum(df_Rep$subgrp=="RRB_over_SC"),
+    #                 m1 = sum(df_Disc$subgrp=="TD"), 
+    #                 m2 = sum(df_Rep$subgrp=="TD"),
+    #                 sample = 2,
+    #                 Type = 'ALL')
+    # aovres[y_var,"RRBoverSC.repBF"] = res_bf[4,2]
+    
+    res_bf = BFSALL(tobs = SCequalRRB_vs_SCoverRRB_Disc_statistic, 
+                      trep = SCequalRRB_vs_SCoverRRB_Rep_statistic, 
+                      n1 = sum(df_Disc$subgrp=="SC_equal_RRB"), 
+                      n2 = sum(df_Rep$subgrp=="SC_equal_RRB"),
+                      m1 = sum(df_Disc$subgrp=="SC_over_RRB"), 
+                      m2 = sum(df_Rep$subgrp=="SC_over_RRB"),
+                      sample = 2, 
+                      Type = 'ALL')
+    aovres[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf[4,2]
+    
+    #--------------------------------------------------------------------------
+    res_bf = BFSALL(tobs =aovres[y_var,"SCcorr_Disc.t"], 
+                      trep = aovres[y_var,"SCcorr_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"SCcorr.repBF"] = res_bf["Replication BF","Replication 1"]
+    
+    res_bf = BFSALL(tobs =aovres[y_var,"RRBcorr_Disc.t"], 
+                      trep = aovres[y_var,"RRBcorr_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"RRBcorr.repBF"] = res_bf["Replication BF","Replication 1"]
+
+    res_bf = BFSALL(tobs =aovres[y_var,"SumSCRRB_Disc.t"], 
+                      trep = aovres[y_var,"SumSCRRB_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"SumSCRRB.repBF"] = res_bf["Replication BF","Replication 1"]
+
+    res_bf = BFSALL(tobs =aovres[y_var,"zds_Disc.t"], 
+                      trep = aovres[y_var,"zds_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"zds.repBF"] = res_bf["Replication BF","Replication 1"]
+
+    
+    
+    res_bf = BFSALL(tobs =aovres[y_var,"VinelandABC_Disc.t"], 
+                      trep = aovres[y_var,"VinelandABC_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"VinelandABC.repBF"] = res_bf["Replication BF","Replication 1"]
+
+    
+    res_bf = BFSALL(tobs =aovres[y_var,"SumSCRRB_SCequalRRB_Disc.t"], 
+                      trep = aovres[y_var,"SumSCRRB_SCequalRRB_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"SumSCRRB_SCequalRRB.repBF"] = res_bf["Replication BF","Replication 1"]
+
+
+    res_bf = BFSALL(tobs =aovres[y_var,"zds_SCequalRRB_Disc.t"], 
+                      trep = aovres[y_var,"zds_SCequalRRB_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"zds_SCequalRRB.repBF"] = res_bf["Replication BF","Replication 1"]
+
+    
+    res_bf = BFSALL(tobs =aovres[y_var,"zds_SCoverRRB_Disc.t"], 
+                      trep = aovres[y_var,"zds_SCoverRRB_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"zds_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
+    
+    
+    res_bf = BFSALL(tobs =aovres[y_var,"VinelandABC_SCequalRRB_Disc.t"], 
+                      trep = aovres[y_var,"VinelandABC_SCequalRRB_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"VinelandABC_SCequalRRB.repBF"] = res_bf["Replication BF","Replication 1"]
+    
+    res_bf = BFSALL(tobs =aovres[y_var,"VinelandABC_SCoverRRB_Disc.t"], 
+                      trep = aovres[y_var,"VinelandABC_SCoverRRB_Rep.t"], 
+                      n1 = n_orig, 
+                      n2 = n_rep,
+                      sample = 1, 
+                      Type = 'ALL')
+    aovres[y_var,"VinelandABC_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
+
+    # res_bf = CorrelationReplicationBF(r.orig = aovres[y_var,"SCcorr_Disc.r"], 
+    #                                                         n.orig = n_orig, 
+    #                                                         r.rep = aovres[y_var,"SCcorr_Rep.r"], 
+    #                                                         n.rep = n_rep)
+    # aovres[y_var,"SCcorr.repBF"] = res_bf["BF10"]
+    # res_bf = CorrelationReplicationBF(r.orig = aovres[y_var,"RRBcorr_Disc.r"], 
+    #                                                         n.orig = n_orig, 
+    #                                                         r.rep = aovres[y_var,"RRBcorr_Rep.r"], 
+    #                                                         n.rep = n_rep)
+    # aovres[y_var,"RRBcorr.repBF"] = res_bf["BF10"]
+    # res_bf = CorrelationReplicationBF(r.orig = aovres[y_var,"SumSCRRB_Disc.r"], 
+    #                                                         n.orig = n_orig, 
+    #                                                         r.rep = aovres[y_var,"SumSCRRB_Rep.r"], 
+    #                                                         n.rep = n_rep)
+    # aovres[y_var,"SumSCRRB.repBF"] = res_bf["BF10"]
+    #--------------------------------------------------------------------------
+
+    # save results to a file
+    fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+    # write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+  }
+  
+  mask1 = aovres$SCequalRRB.repBF>=10
+  mask2 = aovres$SCoverRRB.repBF>=10
+  # mask3 = aovres$RRBoverSC.repBF>=10
+  mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+  mask5 = aovres$SCcorr.repBF>=10
+  mask6 = aovres$RRBcorr.repBF>=10
+  mask7 = aovres$SumSCRRB.repBF>=10
+  mask8 = aovres$zds.repBF>=10
+  mask9 = aovres$zds_SCequalRRB.repBF>=10
+  mask10 = aovres$zds_SCoverRRB.repBF>=10
+  mask11 = aovres$SumSCRRB_SCequalRRB.repBF>=10
+  mask12 = aovres$VinelandABC.repBF>=10
+  mask13 = aovres$VinelandABC_SCequalRRB.repBF>=10
+  mask14 = aovres$VinelandABC_SCoverRRB.repBF>=10
+  mask_allBF = mask1 | mask2 | mask4 | mask5 | mask6 | mask7 | mask8 | mask9 | mask10 | mask11 | mask12 | mask13 | mask14
+  print(aovres[mask_allBF,])
+  
+  # save results to a file
+  fname2save = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_diffzscoreGrps_z%s.csv",as.character(z_thresh)))
+  write.table(aovres, file = fname2save, sep = ",", quote = FALSE, col.names = NA)
+
+} else {
+  
+  fname = file.path(resultpath,"anova_allconnections",sprintf("partialCor_ALLsubs_ridge1_lme_fx_subgrp_sex_scan_age_rx_site_z%s.xlsx",as.character(z_thresh)))
+  aovres = read_excel(fname)
+}
+
+mask1 = aovres$SCequalRRB.repBF>=10
+mask2 = aovres$SCoverRRB.repBF>=10
+# mask3 = aovres$RRBoverSC.repBF>=10
+mask4 = aovres$SCequalRRB_vs_SCoverRRB.repBF>=10
+mask5 = aovres$SCcorr.repBF>=10
+mask6 = aovres$RRBcorr.repBF>=10
+mask7 = aovres$SumSCRRB.repBF>=10
+mask8 = aovres$zds.repBF>=10
+mask9 = aovres$zds_SCequalRRB.repBF>=10
+mask10 = aovres$zds_SCoverRRB.repBF>=10
+mask11 = aovres$SumSCRRB_SCequalRRB.repBF>=10
+mask12 = aovres$VinelandABC.repBF>=10
+mask13 = aovres$VinelandABC_SCequalRRB.repBF>=10
+mask14 = aovres$VinelandABC_SCoverRRB.repBF>=10
+mask_allBF = mask1 | mask2 | mask4 | mask5 | mask6 | mask7 | mask8 | mask9 | mask10 | mask11 | mask12 | mask13 | mask14
+
+aovres[mask_allBF,c("compNames","SCequalRRB.repBF","SCoverRRB.repBF",
+                    "SCcorr_Disc.r","SCcorr_Rep.r","SCcorr_Disc.pval","SCcorr_Rep.pval","SCcorr.repBF",
+                    "RRBcorr_Disc.r","RRBcorr_Rep.r","RRBcorr_Disc.pval","RRBcorr_Rep.pval","RRBcorr.repBF",
+                    "SumSCRRB_Disc.r","SumSCRRB_Rep.r","SumSCRRB_Disc.pval","SumSCRRB_Rep.pval","SumSCRRB.repBF",
+                    "zds_Disc.r","zds_Rep.r","zds_Disc.pval","zds_Rep.pval","zds.repBF",
+                    "SumSCRRB_SCequalRRB_Disc.r","SumSCRRB_SCequalRRB_Rep.r",
+                    "SumSCRRB_SCequalRRB_Disc.pval","SumSCRRB_SCequalRRB_Rep.pval","SumSCRRB_SCequalRRB.repBF",
+                    "zds_SCequalRRB_Disc.r","zds_SCequalRRB_Rep.r",
+                    "zds_SCequalRRB_Disc.pval","zds_SCequalRRB_Rep.pval","zds_SCequalRRB.repBF",
+                    "zds_SCoverRRB_Disc.r","zds_SCoverRRB_Rep.r",
+                    "zds_SCoverRRB_Disc.pval","zds_SCoverRRB_Rep.pval","zds_SCoverRRB.repBF",
+                    "VinelandABC_Disc.r","VinelandABC_Rep.r",
+                    "VinelandABC_Disc.pval","VinelandABC_Rep.pval","VinelandABC.repBF",
+                    "VinelandABC_SCequalRRB_Disc.r","VinelandABC_SCequalRRB_Rep.r",
+                    "VinelandABC_SCequalRRB_Disc.pval","VinelandABC_SCequalRRB_Rep.pval",
+                    "VinelandABC_SCequalRRB.repBF",
+                    "VinelandABC_SCoverRRB_Disc.r","VinelandABC_SCoverRRB_Rep.r",
+                    "VinelandABC_SCoverRRB_Disc.pval","VinelandABC_SCoverRRB_Rep.pval",
+                    "VinelandABC_SCoverRRB.repBF")]
+
+#------------------------------------------------------------------------------
+# Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+SCcorr_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCcorr_Disc_mat) = comps
+colnames(SCcorr_Disc_mat) = comps
+diag(SCcorr_Disc_mat) = 0
+
+SCcorr_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCcorr_Rep_mat) = comps
+colnames(SCcorr_Rep_mat) = comps
+diag(SCcorr_Rep_mat) = 0
+
+RRBcorr_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(RRBcorr_Disc_mat) = comps
+colnames(RRBcorr_Disc_mat) = comps
+diag(RRBcorr_Disc_mat) = 0
+
+RRBcorr_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(RRBcorr_Rep_mat) = comps
+colnames(RRBcorr_Rep_mat) = comps
+diag(RRBcorr_Rep_mat) = 0
+
+SumSCRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SumSCRRB_Disc_mat) = comps
+colnames(SumSCRRB_Disc_mat) = comps
+diag(SumSCRRB_Disc_mat) = 0
+
+SumSCRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SumSCRRB_Rep_mat) = comps
+colnames(SumSCRRB_Rep_mat) = comps
+diag(SumSCRRB_Rep_mat) = 0
+
+zds_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(zds_Disc_mat) = comps
+colnames(zds_Disc_mat) = comps
+diag(zds_Disc_mat) = 0
+
+zds_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(zds_Rep_mat) = comps
+colnames(zds_Rep_mat) = comps
+diag(zds_Rep_mat) = 0
+
+
+zds_SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(zds_SCequalRRB_Disc_mat) = comps
+colnames(zds_SCequalRRB_Disc_mat) = comps
+diag(zds_SCequalRRB_Disc_mat) = 0
+
+zds_SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(zds_SCequalRRB_Rep_mat) = comps
+colnames(zds_SCequalRRB_Rep_mat) = comps
+diag(zds_SCequalRRB_Rep_mat) = 0
+
+zds_SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(zds_SCoverRRB_Disc_mat) = comps
+colnames(zds_SCoverRRB_Disc_mat) = comps
+diag(zds_SCoverRRB_Disc_mat) = 0
+
+zds_SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(zds_SCoverRRB_Rep_mat) = comps
+colnames(zds_SCoverRRB_Rep_mat) = comps
+diag(zds_SCoverRRB_Rep_mat) = 0
+
+
+
+
+VinelandABC_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(VinelandABC_Disc_mat) = comps
+colnames(VinelandABC_Disc_mat) = comps
+diag(VinelandABC_Disc_mat) = 0
+
+VinelandABC_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(VinelandABC_Rep_mat) = comps
+colnames(VinelandABC_Rep_mat) = comps
+diag(VinelandABC_Rep_mat) = 0
+
+
+VinelandABC_SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(VinelandABC_SCequalRRB_Disc_mat) = comps
+colnames(VinelandABC_SCequalRRB_Disc_mat) = comps
+diag(VinelandABC_SCequalRRB_Disc_mat) = 0
+
+VinelandABC_SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(VinelandABC_SCequalRRB_Rep_mat) = comps
+colnames(VinelandABC_SCequalRRB_Rep_mat) = comps
+diag(VinelandABC_SCequalRRB_Rep_mat) = 0
+
+VinelandABC_SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(VinelandABC_SCoverRRB_Disc_mat) = comps
+colnames(VinelandABC_SCoverRRB_Disc_mat) = comps
+diag(VinelandABC_SCoverRRB_Disc_mat) = 0
+
+VinelandABC_SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(VinelandABC_SCoverRRB_Rep_mat) = comps
+colnames(VinelandABC_SCoverRRB_Rep_mat) = comps
+diag(VinelandABC_SCoverRRB_Rep_mat) = 0
+
+
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (aovres[comp_pair,"SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCequalRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCequalRRB_Rep_vs_TD.pval"]<0.05){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"SCoverRRB_Disc_vs_TD.pval"]<0.05 & 
+      aovres[comp_pair,"SCoverRRB_Rep_vs_TD.pval"]<0.05){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"SCcorr.repBF"]>10 & 
+      aovres[comp_pair,"SCcorr_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"SCcorr_Rep.pval"]<0.05){
+    SCcorr_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCcorr_Disc.r"]
+    SCcorr_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCcorr_Rep.r"]
+  } else{
+    SCcorr_Disc_mat[comp1,comp2] = 0.0001
+    SCcorr_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"RRBcorr.repBF"]>10 & 
+      aovres[comp_pair,"RRBcorr_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"RRBcorr_Rep.pval"]<0.05){
+    RRBcorr_Disc_mat[comp1,comp2] = aovres[comp_pair,"RRBcorr_Disc.r"]
+    RRBcorr_Rep_mat[comp1,comp2] = aovres[comp_pair,"RRBcorr_Rep.r"]
+  } else{
+    RRBcorr_Disc_mat[comp1,comp2] = 0.0001
+    RRBcorr_Rep_mat[comp1,comp2] = 0.0001
+  }
+
+  if (aovres[comp_pair,"SumSCRRB.repBF"]>10 & 
+      aovres[comp_pair,"SumSCRRB_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"SumSCRRB_Rep.pval"]<0.05){
+    SumSCRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SumSCRRB_Disc.r"]
+    SumSCRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SumSCRRB_Rep.r"]
+  } else{
+    SumSCRRB_Disc_mat[comp1,comp2] = 0.0001
+    SumSCRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+
+  if (aovres[comp_pair,"zds.repBF"]>10 & 
+      aovres[comp_pair,"zds_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"zds_Rep.pval"]<0.05){
+    zds_Disc_mat[comp1,comp2] = aovres[comp_pair,"zds_Disc.r"]
+    zds_Rep_mat[comp1,comp2] = aovres[comp_pair,"zds_Rep.r"]
+  } else{
+    zds_Disc_mat[comp1,comp2] = 0.0001
+    zds_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"zds_SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"zds_SCequalRRB_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"zds_SCequalRRB_Rep.pval"]<0.05){
+    zds_SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"zds_SCequalRRB_Disc.r"]
+    zds_SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"zds_SCequalRRB_Rep.r"]
+  } else{
+    zds_SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    zds_SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"zds_SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"zds_SCoverRRB_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"zds_SCoverRRB_Rep.pval"]<0.05){
+    zds_SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"zds_SCoverRRB_Disc.r"]
+    zds_SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"zds_SCoverRRB_Rep.r"]
+  } else{
+    zds_SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    zds_SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+
+  if (aovres[comp_pair,"VinelandABC.repBF"]>10 & 
+      aovres[comp_pair,"VinelandABC_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"VinelandABC_Rep.pval"]<0.05){
+    VinelandABC_Disc_mat[comp1,comp2] = aovres[comp_pair,"VinelandABC_Disc.r"]
+    VinelandABC_Rep_mat[comp1,comp2] = aovres[comp_pair,"VinelandABC_Rep.r"]
+  } else{
+    VinelandABC_Disc_mat[comp1,comp2] = 0.0001
+    VinelandABC_Rep_mat[comp1,comp2] = 0.0001
+  }
+
+  if (aovres[comp_pair,"VinelandABC_SCequalRRB.repBF"]>10 & 
+      aovres[comp_pair,"VinelandABC_SCequalRRB_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"VinelandABC_SCequalRRB_Rep.pval"]<0.05){
+    VinelandABC_SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"VinelandABC_SCequalRRB_Disc.r"]
+    VinelandABC_SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"VinelandABC_SCequalRRB_Rep.r"]
+  } else{
+    VinelandABC_SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    VinelandABC_SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+  
+  if (aovres[comp_pair,"VinelandABC_SCoverRRB.repBF"]>10 & 
+      aovres[comp_pair,"VinelandABC_SCoverRRB_Disc.pval"]<0.05 & 
+      aovres[comp_pair,"VinelandABC_SCoverRRB_Rep.pval"]<0.05){
+    VinelandABC_SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"VinelandABC_SCoverRRB_Disc.r"]
+    VinelandABC_SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"VinelandABC_SCoverRRB_Rep.r"]
+  } else{
+    VinelandABC_SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    VinelandABC_SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  }
+      
+}
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCcorr_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCcorr_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(RRBcorr_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(RRBcorr_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SumSCRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SumSCRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(zds_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(zds_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(zds_SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(zds_SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(zds_SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(zds_SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+
+
+
+
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(VinelandABC_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(VinelandABC_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(VinelandABC_SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(VinelandABC_SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(VinelandABC_SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(VinelandABC_SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+
+#------------------------------------------------------------------------------
+# Consensus Chord diagram
+ncomp_pairs = dim(aovres)[1]
+comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
+ncomps = length(comps)
+
+SCequalRRB_consensusPairs = c("IC07_IC13")
+SCoverRRB_consensusPairs = c("IC12_IC17")
+
+SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Disc_mat) = comps
+colnames(SCequalRRB_Disc_mat) = comps
+diag(SCequalRRB_Disc_mat) = 0
+
+SCequalRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCequalRRB_Rep_mat) = comps
+colnames(SCequalRRB_Rep_mat) = comps
+diag(SCequalRRB_Rep_mat) = 0
+
+SCoverRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Disc_mat) = comps
+colnames(SCoverRRB_Disc_mat) = comps
+diag(SCoverRRB_Disc_mat) = 0
+
+SCoverRRB_Rep_mat = matrix(nrow = ncomps, ncol = ncomps)
+rownames(SCoverRRB_Rep_mat) = comps
+colnames(SCoverRRB_Rep_mat) = comps
+diag(SCoverRRB_Rep_mat) = 0
+
+for (comp_pair in aovres$compNames){
+  comp1 = substr(comp_pair,1,4)
+  comp2 = substr(comp_pair,6,10)
+  
+  if (is.element(comp_pair,SCequalRRB_consensusPairs)){
+    SCequalRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Disc_vs_TD.es"]
+    SCequalRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCequalRRB_Rep_vs_TD.es"]
+  } else{
+    SCequalRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCequalRRB_Rep_mat[comp1,comp2] = 0.0001
+  } # if
+  
+  if (is.element(comp_pair,SCoverRRB_consensusPairs)){
+    SCoverRRB_Disc_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Disc_vs_TD.es"]
+    SCoverRRB_Rep_mat[comp1,comp2] = aovres[comp_pair,"SCoverRRB_Rep_vs_TD.es"]
+  } else{
+    SCoverRRB_Disc_mat[comp1,comp2] = 0.0001
+    SCoverRRB_Rep_mat[comp1,comp2] = 0.0001
+  } # if
+
+} # for
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "green", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "grey",
+             IC13 = "green", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "grey",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCequalRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+
+grid.col = c(IC01 = "grey",
+             IC03 = "grey",
+             IC04 = "grey",
+             IC05 = "grey",
+             IC06 = "grey",
+             IC07 = "grey", 
+             IC08 = "grey",
+             IC09 = "grey",
+             IC10 = "grey",
+             IC11 = "grey",
+             IC12 = "blue",
+             IC13 = "grey", 
+             IC14 = "grey",
+             IC15 = "grey",
+             IC16 = "grey",
+             IC17 = "blue",
+             IC18 = "grey",
+             IC19 = "grey",
+             IC20 = "grey")
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Disc_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+col_fun = colorRamp2(c(-0.5, 0, 0.5), c("blue", "white", "red"))
+circos.clear()
+circos.par(gap.after = c(rep(10, ncomps)))
+chordDiagram(SCoverRRB_Rep_mat, grid.col = grid.col, col=col_fun, annotationTrack = c("name","grid"))
+
+plotdefault2 = data.frame(freq = seq(-0.5,0.5, length.out=100),y = as.factor(1))  
+p_cbar = ggplot(data = plotdefault2, aes(x=freq,y=y)) +
+  geom_tile(aes(fill=freq, alpha=0.5)) + 
+  scale_fill_gradientn(colours=c("blue","white","red"), limits=c(-0.5,0.5), breaks=seq(-0.5,0.5,by=0.1)) +
+  theme_minimal() +
+  theme(legend.title = element_blank(),
+        legend.position = "none",
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank()) +
+  coord_flip()
+p_cbar
+```

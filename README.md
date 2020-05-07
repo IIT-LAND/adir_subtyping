@@ -35,10 +35,10 @@ The data directory houses tidy data generated for each step.
 
 ## Code
 
-`_01_preproc*.Rmd` - initial processing of NDAR and LEAP ADI-R data (e.g., scoring)
+`_01_preproc.Rmd` - initial processing of NDAR and LEAP ADI-R data (e.g., scoring)
 
-`_02_subtyping*.Rmd` - subtyping analyses
+`_02_subtyping.Rmd` - subtyping analyses
 
-`_03_connetivity*.Rmd` - connectivity analyses
+`_03_connectivity.Rmd` - connectivity analyses
 
 `_04_gex_decoding.Rmd` - gene expression decoding and enrichment analyses
