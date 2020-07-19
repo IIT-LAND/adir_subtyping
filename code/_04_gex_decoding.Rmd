@@ -226,4 +226,10 @@ pheatmap(logPmat, display_numbers = round(ORmat,digits=2),
          cluster_rows = FALSE, cluster_cols = FALSE,
          breaks= seq(0,3, length=100))
 
+
+
+# finished...
+print("done")
 ```
+
+
