@@ -70,7 +70,10 @@ df = read.delim(fname2open)
 df = subset(df,df$subgrp!="RRB_over_SC")
 
 tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
-tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+#------------------------------------------------------------------------------
+# tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df = subset(tmp_df,tmp_df$z_ds_group!="RRB_over_SC")
+#------------------------------------------------------------------------------
 tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
 tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
 
@@ -516,7 +519,10 @@ df = read.delim(fname2open)
 df = subset(df,df$subgrp!="RRB_over_SC")
 
 tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
-tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+#------------------------------------------------------------------------------
+# tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df = subset(tmp_df,tmp_df$z_ds_group!="RRB_over_SC")
+#------------------------------------------------------------------------------
 tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
 tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
 
@@ -961,7 +967,10 @@ df = read.delim(fname2open)
 df = subset(df,df$subgrp!="RRB_over_SC")
 
 tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
-tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+#------------------------------------------------------------------------------
+# tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df = subset(tmp_df,tmp_df$z_ds_group!="RRB_over_SC")
+#------------------------------------------------------------------------------
 tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
 tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
 
@@ -1405,7 +1414,10 @@ df = read.delim(fname2open)
 df = subset(df,df$subgrp!="RRB_over_SC")
 
 tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
-tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+#------------------------------------------------------------------------------
+# tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df = subset(tmp_df,tmp_df$z_ds_group!="RRB_over_SC")
+#------------------------------------------------------------------------------
 tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
 tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
 
@@ -1849,7 +1861,10 @@ df = read.delim(fname2open)
 df = subset(df,df$subgrp!="RRB_over_SC")
 
 tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
-tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+#------------------------------------------------------------------------------
+# tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df = subset(tmp_df,tmp_df$z_ds_group!="RRB_over_SC")
+#------------------------------------------------------------------------------
 tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
 tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
 
@@ -2293,7 +2308,10 @@ df = read.delim(fname2open)
 df = subset(df,df$subgrp!="RRB_over_SC")
 
 tmp_df = read.csv(file.path(datapath,sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
-tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+#------------------------------------------------------------------------------
+# tmp_df = subset(tmp_df,tmp_df$svm_pred_labels!="RRB_over_SC")
+tmp_df = subset(tmp_df,tmp_df$z_ds_group!="RRB_over_SC")
+#------------------------------------------------------------------------------
 tmp_df$A_pct_severity = (tmp_df$A1_pct_severity+tmp_df$A2_pct_severity+tmp_df$A3_pct_severity)/3
 tmp_df$B_pct_severity = (tmp_df$B1_pct_severity+tmp_df$B2_pct_severity+tmp_df$B3_pct_severity+tmp_df$B4_pct_severity)/4
 tmp_df$AB_pct_severity = tmp_df$A_pct_severity + tmp_df$B_pct_severity 
@@ -3673,7 +3691,7 @@ ncomp_pairs = dim(aovres)[1]
 comps = c("IC01","IC03","IC04","IC05","IC06","IC07","IC08","IC09","IC10","IC11","IC12","IC13","IC14","IC15","IC16","IC17","IC18","IC19","IC20")
 ncomps = length(comps)
 
-SCequalRRB_consensusPairs = c("IC07_IC13")
+SCequalRRB_consensusPairs = c("IC07_IC13","IC03_IC12")
 SCoverRRB_consensusPairs = c("IC12_IC17")
 
 SCequalRRB_Disc_mat = matrix(nrow = ncomps, ncol = ncomps)
@@ -3719,7 +3737,7 @@ for (comp_pair in aovres$compNames){
 } # for
 
 grid.col = c(IC01 = "grey",
-             IC03 = "grey",
+             IC03 = "green",
              IC04 = "grey",
              IC05 = "grey",
              IC06 = "grey",
@@ -3728,7 +3746,7 @@ grid.col = c(IC01 = "grey",
              IC09 = "grey",
              IC10 = "grey",
              IC11 = "grey",
-             IC12 = "grey",
+             IC12 = "green",
              IC13 = "green", 
              IC14 = "grey",
              IC15 = "grey",

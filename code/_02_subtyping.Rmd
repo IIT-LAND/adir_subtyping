@@ -33,26 +33,26 @@ make_subtype <- function(data2use, z_thresh, mean2use=NULL, sd2use=NULL){
   # compute difference score
   vars2use = c("dbaes_atotal","dbaes_btotal")
   diff_score = data2use[,vars2use[1]] - data2use[,vars2use[2]]
-  
+
   # compute mean and sd if necessary
   if (is.null(mean2use)){
     mean2use = mean(diff_score)
   } # if (is.null(mean2use))
-  
+
   if (is.null(sd2use)){
     sd2use = sd(diff_score)
   } # if (is.null(sd2use))
-  
+
   # compute z-score
   data2use$z_ds = (diff_score - mean2use)/sd2use
-  
+
   # make subtype factor
   data2use$z_ds_group = "SC_equal_RRB"
   data2use$z_ds_group[data2use$z_ds>z_thresh] = "SC_over_RRB"
   data2use$z_ds_group[data2use$z_ds<(z_thresh*-1)] = "RRB_over_SC"
   data2use$z_ds_group = factor(data2use$z_ds_group)
   return(data2use)
-  
+
 } # function make_subtype
 
 # read in data
@@ -148,7 +148,7 @@ p = ggplot(data = df4plot, aes(x = variable,
                                colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + guides(color=FALSE) + ylim(0,1)
-p = p + scale_colour_manual(values = colors2use) 
+p = p + scale_colour_manual(values = colors2use)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
 fname2save = file.path(plotpath,
                        sprintf("summaryPlot_IndividualSubs_ADIalgoTotals_verbalDiscovery_euclidean_ward_deepSplit%d.pdf",dS))
@@ -372,7 +372,7 @@ z_thresh = 0.5
 
 # compute Discovery mean and sd
 ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
-mean2use = mean(ds_disc) 
+mean2use = mean(ds_disc)
 sd2use = sd(ds_disc)
 
 Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
@@ -393,12 +393,12 @@ Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 table(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res = chisq.test(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res
 
-# Replication 
+# Replication
 table(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res = chisq.test(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res
@@ -425,55 +425,55 @@ res
 #------------------------------------------------------------------------------
 # Tests of differences in interview age across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in SC across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in RRB across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS SA CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS RRB CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -481,11 +481,11 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Tests of differences in IQ across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -533,11 +533,35 @@ tmp_test = make_subtype(data2use = test_data,
                         z_thresh = z_thresh,
                         mean2use = mean2use,
                         sd2use = sd2use)
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+
+
+
+#==============================================================================
+#==============================================================================
+# make labels based on train mean and sd
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+train_mean = mean2use
+train_sd = sd2use
+
+pred_labels = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = train_mean,
+                        sd2use = train_sd)
+confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#==============================================================================
+#==============================================================================
+
+
+
 
 # plot confusion matrix
 setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
@@ -552,47 +576,73 @@ grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 true_accuracy = acc
 true_accuracy
 
-#------------------------------------------------------------------------------
-# Permute subtype labels to examine how well supervised model performs
 
-# nperm = 10000
 
-# make subtypes using z-scores computed from the mean and sd of the training set
-train_data = Dverbal_Discovery
-test_data = Dverbal_Replication
-mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-tmp_train = make_subtype(data2use = train_data,
-                         z_thresh = z_thresh,
-                         mean2use = mean2use,
-                         sd2use = sd2use)
 
-mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-tmp_test = make_subtype(data2use = test_data,
-                        z_thresh = z_thresh,
-                        mean2use = mean2use,
-                        sd2use = sd2use)
 
-acc = vector(length = nperm)
-for (iperm in 1:nperm){
-  # set seed for reproducibility
-  set.seed(iperm)
-  # compute model
-  permuted_labels = sample(tmp_train$z_ds_group)
-  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
-  pred_labels = predict(mod2use, tmp_test[,vars2use])
-  confmat = table(tmp_test$z_ds_group,pred_labels)
-  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-} # for (iperm in 1:nperm)
+#================================================================================
+#================================================================================
+# #------------------------------------------------------------------------------
+# # Permute subtype labels to examine how well supervised model performs
+#
+# # nperm = 10000
+#
+# # make subtypes using z-scores computed from the mean and sd of the training set
+# train_data = Dverbal_Discovery
+# test_data = Dverbal_Replication
+# mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# tmp_train = make_subtype(data2use = train_data,
+#                          z_thresh = z_thresh,
+#                          mean2use = mean2use,
+#                          sd2use = sd2use)
+#
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# tmp_test = make_subtype(data2use = test_data,
+#                         z_thresh = z_thresh,
+#                         mean2use = mean2use,
+#                         sd2use = sd2use)
+#
+# acc = vector(length = nperm)
+# for (iperm in 1:nperm){
+#   # set seed for reproducibility
+#   set.seed(iperm)
+#
+#   sc_perm = sample(train_data[,vars2use[1]])
+#   rrb_perm = sample(train_data[,vars2use[2]])
+#   perm_mean2use = mean(sc_perm - rrb_perm)
+#   perm_sd2use = sd(sc_perm - rrb_perm)
+#   # perm_mean2use = mean(train_data[,vars2use[1]] - rrb_perm)
+#   # perm_sd2use = sd(train_data[,vars2use[1]] - rrb_perm)
+#   pred_labels = make_subtype(data2use = tmp_test,
+#                         z_thresh = z_thresh,
+#                         mean2use = perm_mean2use,
+#                         sd2use = perm_sd2use)
+#   confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+#   acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+#
+#   # compute model
+#   permuted_labels = sample(tmp_train$z_ds_group)
+#   mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+#   pred_labels = predict(mod2use, tmp_test[,vars2use])
+#   confmat = table(tmp_test$z_ds_group,pred_labels)
+#   acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#   #============================================================================
+# } # for (iperm in 1:nperm)
+#
+# df2plot = data.frame(Accuracy = acc)
+# p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+# p
+#
+# # compute p-value
+# pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+# pval
+#================================================================================
+#================================================================================
 
-df2plot = data.frame(Accuracy = acc)
-p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
-p
 
-# compute p-value
-pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
-pval
+
 
 #------------------------------------------------------------------------------
 # Plot difference score Z subtypes in Discovery set
@@ -607,12 +657,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -632,12 +682,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -651,18 +701,18 @@ p
 # make SC and RRB percentages since EU-AIMS data is specified as percentages
 Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
 euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
-mask1 = euaims_data$Diagnosis=="ASD" 
-mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+mask1 = euaims_data$Diagnosis=="ASD"
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity))
 euaims_data = subset(euaims_data, (mask1 & !mask2))
 
 Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
 Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
-euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
-                               euaims_data$A2_pct_severity + 
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity +
+                               euaims_data$A2_pct_severity +
                                euaims_data$A3_pct_severity)/3
-euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
-                               euaims_data$B2_pct_severity + 
-                               euaims_data$B3_pct_severity + 
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity +
+                               euaims_data$B2_pct_severity +
+                               euaims_data$B3_pct_severity +
                                euaims_data$B4_pct_severity)/4
 
 train_data = Dverbal
@@ -682,22 +732,28 @@ tmp_test = make_subtype(data2use = test_data,
                         mean2use = mean2use,
                         sd2use = sd2use)
 
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
 
-tmp_test$svm_pred_labels = pred_labels
 
-# plot confusion matrix
-setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
-pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
-         breaks= seq(0,100, length=100))
-setHook("grid.newpage", NULL, "replace")
-grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
-grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 
+#===========================================================================
+#===========================================================================
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#
+# tmp_test$svm_pred_labels = pred_labels
+#
+# # plot confusion matrix
+# setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+# pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
+#          breaks= seq(0,100, length=100))
+# setHook("grid.newpage", NULL, "replace")
+# grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
+# grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
+#===========================================================================
+#===========================================================================
 
 
 # scatterplot
@@ -707,18 +763,26 @@ p1
 p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL")
 p2
 
-p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
-p5_bottom_right = p3 + guides(colour=FALSE)
-ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
-p3
+#===========================================================================
+#===========================================================================
+# p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+# p5_bottom_right = p3 + guides(colour=FALSE)
+# ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+# p3
+#===========================================================================
+#===========================================================================
 
 # # write out EU-AIMS LEAP data with subgroups defined by NDAR All
 write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
 
-# Make final plot
-p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
-ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
-p_final
+#===========================================================================
+#===========================================================================
+# # Make final plot
+# p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+# ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+# p_final
+#===========================================================================
+#===========================================================================
 
 #------------------------------------------------------------------------------
 # Integrate subtypes with rest of EU-AIMS LEAP data
@@ -728,7 +792,12 @@ td_df$A_pct_severity = as.numeric(NA)
 td_df$B_pct_severity = as.numeric(NA)
 td_df$subgrp = "TD"
 
-cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+#===========================================================================
+#===========================================================================
+# cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","z_ds_group")
+#===========================================================================
+#===========================================================================
 tmp_asd = tmp_test[,cols2use]
 colnames(tmp_asd)[6] = "A_pct_severity"
 colnames(tmp_asd)[7] = "B_pct_severity"
@@ -850,13 +919,13 @@ res
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 data2use = subset(data2write,data2write$dataset=="Discovery")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
 cs_res
 
-# Replication 
+# Replication
 data2use = subset(data2write,data2write$dataset=="Replication")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
@@ -885,19 +954,19 @@ rownames(output_res) = vars2analyze
 output_res$varNames = vars2analyze
 
 for (ivar in 1:length(vars2analyze)){
-  
+
   y_var = vars2analyze[ivar]
   # print(y_var)
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Disc.fstat"] = res["subgrp","F-value"]
@@ -906,30 +975,30 @@ for (ivar in 1:length(vars2analyze)){
   #----------------------------------------------------------------------------
   # Replication
   df4mod = subset(df2use, df2use$dataset=="Replication")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Rep.fstat"] = res["subgrp","F-value"]
   output_res[y_var,"All_Rep.pval"] = res["subgrp","p-value"]
-  
+
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n1 = sum(df4mod$subgrp=="SC_equal_RRB")
   m1 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Disc.fstat"] = res["subgrp","F-value"]
@@ -944,13 +1013,13 @@ for (ivar in 1:length(vars2analyze)){
   df4mod = subset(df2use, df2use$dataset=="Replication" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n2 = sum(df4mod$subgrp=="SC_equal_RRB")
   m2 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Rep.fstat"] = res["subgrp","F-value"]
@@ -971,16 +1040,16 @@ for (ivar in 1:length(vars2analyze)){
                   sample = 2,
                   Type = 'ALL')
   output_res[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
-  
-  # make a plot  
+
+  # make a plot
   colors2use = get_ggColorHue(3)
   df4plot = subset(df2use, df2use$subgrp!="RRB_over_SC")
   p = ggplot(data = df4plot, aes_string(x = "subgrp", y = y_var, colour = "subgrp")) + facet_grid(. ~ dataset)
-  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) 
-  p = p + ylab(vnames[ivar]) + xlab("Group") + 
-    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) + 
+  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA)
+  p = p + ylab(vnames[ivar]) + xlab("Group") +
+    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) +
                        scale_colour_manual(values = c(colors2use[2:3],"grey60")) + guides(colour=FALSE) +
-    theme(text = element_text(size=fontSize-5), 
+    theme(text = element_text(size=fontSize-5),
         axis.text.x = element_text(size=fontSize-5),
         axis.text.y = element_text(size=fontSize-5))
   print(p)
@@ -1011,7 +1080,7 @@ z_thresh = 0.6
 
 # compute Discovery mean and sd
 ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
-mean2use = mean(ds_disc) 
+mean2use = mean(ds_disc)
 sd2use = sd(ds_disc)
 
 Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
@@ -1032,12 +1101,12 @@ Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 table(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res = chisq.test(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res
 
-# Replication 
+# Replication
 table(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res = chisq.test(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res
@@ -1064,55 +1133,55 @@ res
 #------------------------------------------------------------------------------
 # Tests of differences in interview age across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in SC across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in RRB across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS SA CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS RRB CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -1120,17 +1189,17 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Tests of differences in IQ across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 
 #------------------------------------------------------------------------------
-## Make scatterplots with difference score Z subtypes in different colors
+# Make scatterplots with difference score Z subtypes in different colors
 maxScores = c(3,4)
 
 p_disc = ggplot(data = Dverbal_Discovery, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) + ggtitle("NDAR Discovery")
@@ -1172,11 +1241,29 @@ tmp_test = make_subtype(data2use = test_data,
                         z_thresh = z_thresh,
                         mean2use = mean2use,
                         sd2use = sd2use)
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+#==============================================================================
+#==============================================================================
+# make labels based on train mean and sd
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+train_mean = mean2use
+train_sd = sd2use
+
+pred_labels = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = train_mean,
+                        sd2use = train_sd)
+confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#==============================================================================
+#==============================================================================
 
 # plot confusion matrix
 setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
@@ -1187,51 +1274,70 @@ grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
 grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 
 
-
 # show accuracy
 true_accuracy = acc
 true_accuracy
 
-#------------------------------------------------------------------------------
-# Permute subtype labels to examine how well supervised model performs
-# nperm = 10000
-
-# make subtypes using z-scores computed from the mean and sd of the training set
-train_data = Dverbal_Discovery
-test_data = Dverbal_Replication
-mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-tmp_train = make_subtype(data2use = train_data,
-                         z_thresh = z_thresh,
-                         mean2use = mean2use,
-                         sd2use = sd2use)
-
-mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-tmp_test = make_subtype(data2use = test_data,
-                        z_thresh = z_thresh,
-                        mean2use = mean2use,
-                        sd2use = sd2use)
-
-acc = vector(length = nperm)
-for (iperm in 1:nperm){
-  # set seed for reproducibility
-  set.seed(iperm)
-  # compute model
-  permuted_labels = sample(tmp_train$z_ds_group)
-  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
-  pred_labels = predict(mod2use, tmp_test[,vars2use])
-  confmat = table(tmp_test$z_ds_group,pred_labels)
-  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-} # for (iperm in 1:nperm)
-
-df2plot = data.frame(Accuracy = acc)
-p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
-p
-
-# compute p-value
-pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
-pval
+#================================================================================
+#================================================================================
+# #------------------------------------------------------------------------------
+# # Permute subtype labels to examine how well supervised model performs
+#
+# # nperm = 10000
+#
+# # make subtypes using z-scores computed from the mean and sd of the training set
+# train_data = Dverbal_Discovery
+# test_data = Dverbal_Replication
+# mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# tmp_train = make_subtype(data2use = train_data,
+#                          z_thresh = z_thresh,
+#                          mean2use = mean2use,
+#                          sd2use = sd2use)
+#
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# tmp_test = make_subtype(data2use = test_data,
+#                         z_thresh = z_thresh,
+#                         mean2use = mean2use,
+#                         sd2use = sd2use)
+#
+# acc = vector(length = nperm)
+# for (iperm in 1:nperm){
+#   # set seed for reproducibility
+#   set.seed(iperm)
+#
+#   sc_perm = sample(train_data[,vars2use[1]])
+#   rrb_perm = sample(train_data[,vars2use[2]])
+#   perm_mean2use = mean(sc_perm - rrb_perm)
+#   perm_sd2use = sd(sc_perm - rrb_perm)
+#   # perm_mean2use = mean(train_data[,vars2use[1]] - rrb_perm)
+#   # perm_sd2use = sd(train_data[,vars2use[1]] - rrb_perm)
+#   pred_labels = make_subtype(data2use = tmp_test,
+#                         z_thresh = z_thresh,
+#                         mean2use = perm_mean2use,
+#                         sd2use = perm_sd2use)
+#   confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+#   acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+#
+#   # compute model
+#   permuted_labels = sample(tmp_train$z_ds_group)
+#   mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+#   pred_labels = predict(mod2use, tmp_test[,vars2use])
+#   confmat = table(tmp_test$z_ds_group,pred_labels)
+#   acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#   #============================================================================
+# } # for (iperm in 1:nperm)
+#
+# df2plot = data.frame(Accuracy = acc)
+# p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+# p
+#
+# # compute p-value
+# pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+# pval
+#================================================================================
+#================================================================================
 
 #------------------------------------------------------------------------------
 # Plot difference score Z subtypes in Discovery set
@@ -1246,12 +1352,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -1271,12 +1377,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -1290,18 +1396,18 @@ p
 # make SC and RRB percentages since EU-AIMS data is specified as percentages
 Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
 euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
-mask1 = euaims_data$Diagnosis=="ASD" 
-mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+mask1 = euaims_data$Diagnosis=="ASD"
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity))
 euaims_data = subset(euaims_data, (mask1 & !mask2))
 
 Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
 Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
-euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
-                               euaims_data$A2_pct_severity + 
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity +
+                               euaims_data$A2_pct_severity +
                                euaims_data$A3_pct_severity)/3
-euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
-                               euaims_data$B2_pct_severity + 
-                               euaims_data$B3_pct_severity + 
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity +
+                               euaims_data$B2_pct_severity +
+                               euaims_data$B3_pct_severity +
                                euaims_data$B4_pct_severity)/4
 
 train_data = Dverbal
@@ -1321,22 +1427,25 @@ tmp_test = make_subtype(data2use = test_data,
                         mean2use = mean2use,
                         sd2use = sd2use)
 
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-
-tmp_test$svm_pred_labels = pred_labels
-
-# plot confusion matrix
-setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
-pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
-         breaks= seq(0,100, length=100))
-setHook("grid.newpage", NULL, "replace")
-grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
-grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
-
+#===========================================================================
+#===========================================================================
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#
+# tmp_test$svm_pred_labels = pred_labels
+#
+# # plot confusion matrix
+# setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+# pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
+#          breaks= seq(0,100, length=100))
+# setHook("grid.newpage", NULL, "replace")
+# grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
+# grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
+#===========================================================================
+#===========================================================================
 
 # scatterplot
 p1 = ggplot(data = tmp_train, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("NDAR ALL")
@@ -1345,18 +1454,26 @@ p1
 p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL")
 p2
 
-p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
-p5_bottom_right = p3 + guides(colour=FALSE)
-ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
-p3
+#===========================================================================
+#===========================================================================
+# p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+# p5_bottom_right = p3 + guides(colour=FALSE)
+# ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+# p3
+#===========================================================================
+#===========================================================================
 
 # # write out EU-AIMS LEAP data with subgroups defined by NDAR All
 write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
 
-# Make final plot
-p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
-ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
-p_final
+#===========================================================================
+#===========================================================================
+# # Make final plot
+# p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+# ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+# p_final
+#===========================================================================
+#===========================================================================
 
 #------------------------------------------------------------------------------
 # Integrate subtypes with rest of EU-AIMS LEAP data
@@ -1366,7 +1483,12 @@ td_df$A_pct_severity = as.numeric(NA)
 td_df$B_pct_severity = as.numeric(NA)
 td_df$subgrp = "TD"
 
-cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+#===========================================================================
+#===========================================================================
+# cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","z_ds_group")
+#===========================================================================
+#===========================================================================
 tmp_asd = tmp_test[,cols2use]
 colnames(tmp_asd)[6] = "A_pct_severity"
 colnames(tmp_asd)[7] = "B_pct_severity"
@@ -1488,13 +1610,13 @@ res
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 data2use = subset(data2write,data2write$dataset=="Discovery")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
 cs_res
 
-# Replication 
+# Replication
 data2use = subset(data2write,data2write$dataset=="Replication")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
@@ -1523,19 +1645,19 @@ rownames(output_res) = vars2analyze
 output_res$varNames = vars2analyze
 
 for (ivar in 1:length(vars2analyze)){
-  
+
   y_var = vars2analyze[ivar]
   # print(y_var)
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Disc.fstat"] = res["subgrp","F-value"]
@@ -1544,30 +1666,30 @@ for (ivar in 1:length(vars2analyze)){
   #----------------------------------------------------------------------------
   # Replication
   df4mod = subset(df2use, df2use$dataset=="Replication")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Rep.fstat"] = res["subgrp","F-value"]
   output_res[y_var,"All_Rep.pval"] = res["subgrp","p-value"]
-  
+
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n1 = sum(df4mod$subgrp=="SC_equal_RRB")
   m1 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Disc.fstat"] = res["subgrp","F-value"]
@@ -1582,13 +1704,13 @@ for (ivar in 1:length(vars2analyze)){
   df4mod = subset(df2use, df2use$dataset=="Replication" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n2 = sum(df4mod$subgrp=="SC_equal_RRB")
   m2 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Rep.fstat"] = res["subgrp","F-value"]
@@ -1609,16 +1731,16 @@ for (ivar in 1:length(vars2analyze)){
                   sample = 2,
                   Type = 'ALL')
   output_res[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
-  
-  # make a plot  
+
+  # make a plot
   colors2use = get_ggColorHue(3)
   df4plot = subset(df2use, df2use$subgrp!="RRB_over_SC")
   p = ggplot(data = df4plot, aes_string(x = "subgrp", y = y_var, colour = "subgrp")) + facet_grid(. ~ dataset)
-  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) 
-  p = p + ylab(vnames[ivar]) + xlab("Group") + 
-    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) + 
+  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA)
+  p = p + ylab(vnames[ivar]) + xlab("Group") +
+    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) +
                        scale_colour_manual(values = c(colors2use[2:3],"grey60")) + guides(colour=FALSE) +
-    theme(text = element_text(size=fontSize-5), 
+    theme(text = element_text(size=fontSize-5),
         axis.text.x = element_text(size=fontSize-5),
         axis.text.y = element_text(size=fontSize-5))
   print(p)
@@ -1642,7 +1764,7 @@ z_thresh = 0.7
 
 # compute Discovery mean and sd
 ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
-mean2use = mean(ds_disc) 
+mean2use = mean(ds_disc)
 sd2use = sd(ds_disc)
 
 Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
@@ -1663,12 +1785,12 @@ Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 table(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res = chisq.test(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res
 
-# Replication 
+# Replication
 table(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res = chisq.test(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res
@@ -1695,55 +1817,55 @@ res
 #------------------------------------------------------------------------------
 # Tests of differences in interview age across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in SC across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in RRB across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS SA CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS RRB CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -1751,14 +1873,13 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Tests of differences in IQ across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
-
 
 
 #------------------------------------------------------------------------------
@@ -1804,11 +1925,29 @@ tmp_test = make_subtype(data2use = test_data,
                         z_thresh = z_thresh,
                         mean2use = mean2use,
                         sd2use = sd2use)
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+#==============================================================================
+#==============================================================================
+# make labels based on train mean and sd
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+train_mean = mean2use
+train_sd = sd2use
+
+pred_labels = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = train_mean,
+                        sd2use = train_sd)
+confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#==============================================================================
+#==============================================================================
 
 # plot confusion matrix
 setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
@@ -1823,46 +1962,66 @@ grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 true_accuracy = acc
 true_accuracy
 
-#------------------------------------------------------------------------------
-# Permute subtype labels to examine how well supervised model performs
-# nperm = 10000
-
-# make subtypes using z-scores computed from the mean and sd of the training set
-train_data = Dverbal_Discovery
-test_data = Dverbal_Replication
-mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-tmp_train = make_subtype(data2use = train_data,
-                         z_thresh = z_thresh,
-                         mean2use = mean2use,
-                         sd2use = sd2use)
-
-mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-tmp_test = make_subtype(data2use = test_data,
-                        z_thresh = z_thresh,
-                        mean2use = mean2use,
-                        sd2use = sd2use)
-
-acc = vector(length = nperm)
-for (iperm in 1:nperm){
-  # set seed for reproducibility
-  set.seed(iperm)
-  # compute model
-  permuted_labels = sample(tmp_train$z_ds_group)
-  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
-  pred_labels = predict(mod2use, tmp_test[,vars2use])
-  confmat = table(tmp_test$z_ds_group,pred_labels)
-  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-} # for (iperm in 1:nperm)
-
-df2plot = data.frame(Accuracy = acc)
-p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
-p
-
-# compute p-value
-pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
-pval
+#================================================================================
+#================================================================================
+# #------------------------------------------------------------------------------
+# # Permute subtype labels to examine how well supervised model performs
+#
+# # nperm = 10000
+#
+# # make subtypes using z-scores computed from the mean and sd of the training set
+# train_data = Dverbal_Discovery
+# test_data = Dverbal_Replication
+# mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# tmp_train = make_subtype(data2use = train_data,
+#                          z_thresh = z_thresh,
+#                          mean2use = mean2use,
+#                          sd2use = sd2use)
+#
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# tmp_test = make_subtype(data2use = test_data,
+#                         z_thresh = z_thresh,
+#                         mean2use = mean2use,
+#                         sd2use = sd2use)
+#
+# acc = vector(length = nperm)
+# for (iperm in 1:nperm){
+#   # set seed for reproducibility
+#   set.seed(iperm)
+#
+#   sc_perm = sample(train_data[,vars2use[1]])
+#   rrb_perm = sample(train_data[,vars2use[2]])
+#   perm_mean2use = mean(sc_perm - rrb_perm)
+#   perm_sd2use = sd(sc_perm - rrb_perm)
+#   # perm_mean2use = mean(train_data[,vars2use[1]] - rrb_perm)
+#   # perm_sd2use = sd(train_data[,vars2use[1]] - rrb_perm)
+#   pred_labels = make_subtype(data2use = tmp_test,
+#                         z_thresh = z_thresh,
+#                         mean2use = perm_mean2use,
+#                         sd2use = perm_sd2use)
+#   confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+#   acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+#
+#   # compute model
+#   permuted_labels = sample(tmp_train$z_ds_group)
+#   mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+#   pred_labels = predict(mod2use, tmp_test[,vars2use])
+#   confmat = table(tmp_test$z_ds_group,pred_labels)
+#   acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#   #============================================================================
+# } # for (iperm in 1:nperm)
+#
+# df2plot = data.frame(Accuracy = acc)
+# p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+# p
+#
+# # compute p-value
+# pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+# pval
+#================================================================================
+#================================================================================
 
 #------------------------------------------------------------------------------
 # Plot difference score Z subtypes in Discovery set
@@ -1877,12 +2036,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -1902,12 +2061,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -1921,19 +2080,18 @@ p
 # make SC and RRB percentages since EU-AIMS data is specified as percentages
 Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
 euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
-mask1 = euaims_data$Diagnosis=="ASD" 
-mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+mask1 = euaims_data$Diagnosis=="ASD"
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity))
 euaims_data = subset(euaims_data, (mask1 & !mask2))
-
 
 Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
 Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
-euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
-                               euaims_data$A2_pct_severity + 
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity +
+                               euaims_data$A2_pct_severity +
                                euaims_data$A3_pct_severity)/3
-euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
-                               euaims_data$B2_pct_severity + 
-                               euaims_data$B3_pct_severity + 
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity +
+                               euaims_data$B2_pct_severity +
+                               euaims_data$B3_pct_severity +
                                euaims_data$B4_pct_severity)/4
 
 train_data = Dverbal
@@ -1953,23 +2111,25 @@ tmp_test = make_subtype(data2use = test_data,
                         mean2use = mean2use,
                         sd2use = sd2use)
 
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-
-tmp_test$svm_pred_labels = pred_labels
-
-# plot confusion matrix
-setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
-pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
-         breaks= seq(0,100, length=100))
-setHook("grid.newpage", NULL, "replace")
-grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
-grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
-
-
+#===========================================================================
+#===========================================================================
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#
+# tmp_test$svm_pred_labels = pred_labels
+#
+# # plot confusion matrix
+# setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+# pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
+#          breaks= seq(0,100, length=100))
+# setHook("grid.newpage", NULL, "replace")
+# grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
+# grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
+#===========================================================================
+#===========================================================================
 
 
 # scatterplot
@@ -1979,19 +2139,26 @@ p1
 p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL")
 p2
 
-p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
-p5_bottom_right = p3 + guides(colour=FALSE)
-ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
-p3
+#===========================================================================
+#===========================================================================
+# p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+# p5_bottom_right = p3 + guides(colour=FALSE)
+# ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+# p3
+#===========================================================================
+#===========================================================================
 
 # # write out EU-AIMS LEAP data with subgroups defined by NDAR All
 write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
 
-
-# Make final plot
-p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
-ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
-p_final
+#===========================================================================
+#===========================================================================
+# # Make final plot
+# p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+# ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+# p_final
+#===========================================================================
+#===========================================================================
 
 #------------------------------------------------------------------------------
 # Integrate subtypes with rest of EU-AIMS LEAP data
@@ -2001,7 +2168,12 @@ td_df$A_pct_severity = as.numeric(NA)
 td_df$B_pct_severity = as.numeric(NA)
 td_df$subgrp = "TD"
 
-cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+#===========================================================================
+#===========================================================================
+# cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","z_ds_group")
+#===========================================================================
+#===========================================================================
 tmp_asd = tmp_test[,cols2use]
 colnames(tmp_asd)[6] = "A_pct_severity"
 colnames(tmp_asd)[7] = "B_pct_severity"
@@ -2122,13 +2294,13 @@ res
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 data2use = subset(data2write,data2write$dataset=="Discovery")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
 cs_res
 
-# Replication 
+# Replication
 data2use = subset(data2write,data2write$dataset=="Replication")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
@@ -2157,19 +2329,19 @@ rownames(output_res) = vars2analyze
 output_res$varNames = vars2analyze
 
 for (ivar in 1:length(vars2analyze)){
-  
+
   y_var = vars2analyze[ivar]
   # print(y_var)
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Disc.fstat"] = res["subgrp","F-value"]
@@ -2178,30 +2350,30 @@ for (ivar in 1:length(vars2analyze)){
   #----------------------------------------------------------------------------
   # Replication
   df4mod = subset(df2use, df2use$dataset=="Replication")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Rep.fstat"] = res["subgrp","F-value"]
   output_res[y_var,"All_Rep.pval"] = res["subgrp","p-value"]
-  
+
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n1 = sum(df4mod$subgrp=="SC_equal_RRB")
   m1 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Disc.fstat"] = res["subgrp","F-value"]
@@ -2216,13 +2388,13 @@ for (ivar in 1:length(vars2analyze)){
   df4mod = subset(df2use, df2use$dataset=="Replication" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n2 = sum(df4mod$subgrp=="SC_equal_RRB")
   m2 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Rep.fstat"] = res["subgrp","F-value"]
@@ -2243,16 +2415,16 @@ for (ivar in 1:length(vars2analyze)){
                   sample = 2,
                   Type = 'ALL')
   output_res[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
-  
-  # make a plot  
+
+  # make a plot
   colors2use = get_ggColorHue(3)
   df4plot = subset(df2use, df2use$subgrp!="RRB_over_SC")
   p = ggplot(data = df4plot, aes_string(x = "subgrp", y = y_var, colour = "subgrp")) + facet_grid(. ~ dataset)
-  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) 
-  p = p + ylab(vnames[ivar]) + xlab("Group") + 
-    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) + 
+  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA)
+  p = p + ylab(vnames[ivar]) + xlab("Group") +
+    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) +
                        scale_colour_manual(values = c(colors2use[2:3],"grey60")) + guides(colour=FALSE) +
-    theme(text = element_text(size=fontSize-5), 
+    theme(text = element_text(size=fontSize-5),
         axis.text.x = element_text(size=fontSize-5),
         axis.text.y = element_text(size=fontSize-5))
   print(p)
@@ -2276,7 +2448,7 @@ z_thresh = 0.8
 
 # compute Discovery mean and sd
 ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
-mean2use = mean(ds_disc) 
+mean2use = mean(ds_disc)
 sd2use = sd(ds_disc)
 
 Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
@@ -2286,8 +2458,8 @@ Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
 
 # compute Replication mean and sd
 ds_rep = Dverbal_Replication[,vars2use[1]] - Dverbal_Replication[,vars2use[2]]
-# mean2use = mean(ds_rep) 
-# sd2use = sd(ds_rep)
+mean2use = mean(ds_rep)
+sd2use = sd(ds_rep)
 
 Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
                                  z_thresh = z_thresh,
@@ -2297,12 +2469,12 @@ Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 table(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res = chisq.test(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res
 
-# Replication 
+# Replication
 table(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res = chisq.test(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res
@@ -2329,55 +2501,55 @@ res
 #------------------------------------------------------------------------------
 # Tests of differences in interview age across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in SC across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in RRB across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS SA CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS RRB CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -2385,14 +2557,13 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Tests of differences in IQ across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
-
 
 
 #------------------------------------------------------------------------------
@@ -2438,11 +2609,29 @@ tmp_test = make_subtype(data2use = test_data,
                         z_thresh = z_thresh,
                         mean2use = mean2use,
                         sd2use = sd2use)
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+#==============================================================================
+#==============================================================================
+# make labels based on train mean and sd
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+train_mean = mean2use
+train_sd = sd2use
+
+pred_labels = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = train_mean,
+                        sd2use = train_sd)
+confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#==============================================================================
+#==============================================================================
 
 # plot confusion matrix
 setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
@@ -2453,51 +2642,70 @@ grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
 grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 
 
-
 # show accuracy
 true_accuracy = acc
 true_accuracy
 
-#------------------------------------------------------------------------------
-# Permute subtype labels to examine how well supervised model performs
-# nperm = 10000
-
-# make subtypes using z-scores computed from the mean and sd of the training set
-train_data = Dverbal_Discovery
-test_data = Dverbal_Replication
-mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-tmp_train = make_subtype(data2use = train_data,
-                         z_thresh = z_thresh,
-                         mean2use = mean2use,
-                         sd2use = sd2use)
-
-mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-tmp_test = make_subtype(data2use = test_data,
-                        z_thresh = z_thresh,
-                        mean2use = mean2use,
-                        sd2use = sd2use)
-
-acc = vector(length = nperm)
-for (iperm in 1:nperm){
-  # set seed for reproducibility
-  set.seed(iperm)
-  # compute model
-  permuted_labels = sample(tmp_train$z_ds_group)
-  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
-  pred_labels = predict(mod2use, tmp_test[,vars2use])
-  confmat = table(tmp_test$z_ds_group,pred_labels)
-  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-} # for (iperm in 1:nperm)
-
-df2plot = data.frame(Accuracy = acc)
-p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
-p
-
-# compute p-value
-pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
-pval
+#================================================================================
+#================================================================================
+# #------------------------------------------------------------------------------
+# # Permute subtype labels to examine how well supervised model performs
+#
+# # nperm = 10000
+#
+# # make subtypes using z-scores computed from the mean and sd of the training set
+# train_data = Dverbal_Discovery
+# test_data = Dverbal_Replication
+# mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# tmp_train = make_subtype(data2use = train_data,
+#                          z_thresh = z_thresh,
+#                          mean2use = mean2use,
+#                          sd2use = sd2use)
+#
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# tmp_test = make_subtype(data2use = test_data,
+#                         z_thresh = z_thresh,
+#                         mean2use = mean2use,
+#                         sd2use = sd2use)
+#
+# acc = vector(length = nperm)
+# for (iperm in 1:nperm){
+#   # set seed for reproducibility
+#   set.seed(iperm)
+#
+#   sc_perm = sample(train_data[,vars2use[1]])
+#   rrb_perm = sample(train_data[,vars2use[2]])
+#   perm_mean2use = mean(sc_perm - rrb_perm)
+#   perm_sd2use = sd(sc_perm - rrb_perm)
+#   # perm_mean2use = mean(train_data[,vars2use[1]] - rrb_perm)
+#   # perm_sd2use = sd(train_data[,vars2use[1]] - rrb_perm)
+#   pred_labels = make_subtype(data2use = tmp_test,
+#                         z_thresh = z_thresh,
+#                         mean2use = perm_mean2use,
+#                         sd2use = perm_sd2use)
+#   confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+#   acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+#
+#   # compute model
+#   permuted_labels = sample(tmp_train$z_ds_group)
+#   mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+#   pred_labels = predict(mod2use, tmp_test[,vars2use])
+#   confmat = table(tmp_test$z_ds_group,pred_labels)
+#   acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#   #============================================================================
+# } # for (iperm in 1:nperm)
+#
+# df2plot = data.frame(Accuracy = acc)
+# p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+# p
+#
+# # compute p-value
+# pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+# pval
+#================================================================================
+#================================================================================
 
 #------------------------------------------------------------------------------
 # Plot difference score Z subtypes in Discovery set
@@ -2512,19 +2720,18 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
 p3_middle_top = p + guides(colour=FALSE)
 ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Disc_jitterplot_z%s.pdf",as.character(z_thresh))), plot = p3_middle_top)
 p
-
 
 # Plot difference score Z subtypes in Replication set
 maxScores = c(3,4)
@@ -2538,12 +2745,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -2557,19 +2764,18 @@ p
 # make SC and RRB percentages since EU-AIMS data is specified as percentages
 Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
 euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
-mask1 = euaims_data$Diagnosis=="ASD" 
-mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+mask1 = euaims_data$Diagnosis=="ASD"
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity))
 euaims_data = subset(euaims_data, (mask1 & !mask2))
-
 
 Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
 Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
-euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
-                               euaims_data$A2_pct_severity + 
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity +
+                               euaims_data$A2_pct_severity +
                                euaims_data$A3_pct_severity)/3
-euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
-                               euaims_data$B2_pct_severity + 
-                               euaims_data$B3_pct_severity + 
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity +
+                               euaims_data$B2_pct_severity +
+                               euaims_data$B3_pct_severity +
                                euaims_data$B4_pct_severity)/4
 
 train_data = Dverbal
@@ -2589,24 +2795,25 @@ tmp_test = make_subtype(data2use = test_data,
                         mean2use = mean2use,
                         sd2use = sd2use)
 
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-
-tmp_test$svm_pred_labels = pred_labels
-
-# plot confusion matrix
-setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
-pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
-         breaks= seq(0,100, length=100))
-setHook("grid.newpage", NULL, "replace")
-grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
-grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
-
-
-
+#===========================================================================
+#===========================================================================
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#
+# tmp_test$svm_pred_labels = pred_labels
+#
+# # plot confusion matrix
+# setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+# pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
+#          breaks= seq(0,100, length=100))
+# setHook("grid.newpage", NULL, "replace")
+# grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
+# grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
+#===========================================================================
+#===========================================================================
 
 # scatterplot
 p1 = ggplot(data = tmp_train, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("NDAR ALL")
@@ -2615,18 +2822,26 @@ p1
 p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL")
 p2
 
-p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
-p5_bottom_right = p3 + guides(colour=FALSE)
-ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
-p3
+#===========================================================================
+#===========================================================================
+# p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+# p5_bottom_right = p3 + guides(colour=FALSE)
+# ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+# p3
+#===========================================================================
+#===========================================================================
 
 # # write out EU-AIMS LEAP data with subgroups defined by NDAR All
 write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
 
-# Make final plot
-p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
-ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
-p_final
+#===========================================================================
+#===========================================================================
+# # Make final plot
+# p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+# ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+# p_final
+#===========================================================================
+#===========================================================================
 
 #------------------------------------------------------------------------------
 # Integrate subtypes with rest of EU-AIMS LEAP data
@@ -2636,7 +2851,12 @@ td_df$A_pct_severity = as.numeric(NA)
 td_df$B_pct_severity = as.numeric(NA)
 td_df$subgrp = "TD"
 
-cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+#===========================================================================
+#===========================================================================
+# cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","z_ds_group")
+#===========================================================================
+#===========================================================================
 tmp_asd = tmp_test[,cols2use]
 colnames(tmp_asd)[6] = "A_pct_severity"
 colnames(tmp_asd)[7] = "B_pct_severity"
@@ -2758,13 +2978,13 @@ res
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 data2use = subset(data2write,data2write$dataset=="Discovery")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
 cs_res
 
-# Replication 
+# Replication
 data2use = subset(data2write,data2write$dataset=="Replication")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
@@ -2793,19 +3013,19 @@ rownames(output_res) = vars2analyze
 output_res$varNames = vars2analyze
 
 for (ivar in 1:length(vars2analyze)){
-  
+
   y_var = vars2analyze[ivar]
   # print(y_var)
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Disc.fstat"] = res["subgrp","F-value"]
@@ -2814,30 +3034,30 @@ for (ivar in 1:length(vars2analyze)){
   #----------------------------------------------------------------------------
   # Replication
   df4mod = subset(df2use, df2use$dataset=="Replication")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Rep.fstat"] = res["subgrp","F-value"]
   output_res[y_var,"All_Rep.pval"] = res["subgrp","p-value"]
-  
+
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n1 = sum(df4mod$subgrp=="SC_equal_RRB")
   m1 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Disc.fstat"] = res["subgrp","F-value"]
@@ -2852,13 +3072,13 @@ for (ivar in 1:length(vars2analyze)){
   df4mod = subset(df2use, df2use$dataset=="Replication" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n2 = sum(df4mod$subgrp=="SC_equal_RRB")
   m2 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Rep.fstat"] = res["subgrp","F-value"]
@@ -2879,16 +3099,16 @@ for (ivar in 1:length(vars2analyze)){
                   sample = 2,
                   Type = 'ALL')
   output_res[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
-  
-  # make a plot  
+
+  # make a plot
   colors2use = get_ggColorHue(3)
   df4plot = subset(df2use, df2use$subgrp!="RRB_over_SC")
   p = ggplot(data = df4plot, aes_string(x = "subgrp", y = y_var, colour = "subgrp")) + facet_grid(. ~ dataset)
-  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) 
-  p = p + ylab(vnames[ivar]) + xlab("Group") + 
-    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) + 
+  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA)
+  p = p + ylab(vnames[ivar]) + xlab("Group") +
+    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) +
                        scale_colour_manual(values = c(colors2use[2:3],"grey60")) + guides(colour=FALSE) +
-    theme(text = element_text(size=fontSize-5), 
+    theme(text = element_text(size=fontSize-5),
         axis.text.x = element_text(size=fontSize-5),
         axis.text.y = element_text(size=fontSize-5))
   print(p)
@@ -2912,7 +3132,7 @@ z_thresh = 0.9
 
 # compute Discovery mean and sd
 ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
-mean2use = mean(ds_disc) 
+mean2use = mean(ds_disc)
 sd2use = sd(ds_disc)
 
 Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
@@ -2922,8 +3142,8 @@ Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
 
 # compute Replication mean and sd
 ds_rep = Dverbal_Replication[,vars2use[1]] - Dverbal_Replication[,vars2use[2]]
-# mean2use = mean(ds_rep) 
-# sd2use = sd(ds_rep)
+mean2use = mean(ds_rep)
+sd2use = sd(ds_rep)
 
 Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
                                  z_thresh = z_thresh,
@@ -2933,12 +3153,12 @@ Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 table(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res = chisq.test(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res
 
-# Replication 
+# Replication
 table(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res = chisq.test(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res
@@ -2965,55 +3185,55 @@ res
 #------------------------------------------------------------------------------
 # Tests of differences in interview age across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in SC across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in RRB across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS SA CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS RRB CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -3021,11 +3241,11 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Tests of differences in IQ across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -3073,11 +3293,29 @@ tmp_test = make_subtype(data2use = test_data,
                         z_thresh = z_thresh,
                         mean2use = mean2use,
                         sd2use = sd2use)
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+#==============================================================================
+#==============================================================================
+# make labels based on train mean and sd
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+train_mean = mean2use
+train_sd = sd2use
+
+pred_labels = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = train_mean,
+                        sd2use = train_sd)
+confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#==============================================================================
+#==============================================================================
 
 # plot confusion matrix
 setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
@@ -3092,46 +3330,66 @@ grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 true_accuracy = acc
 true_accuracy
 
-#------------------------------------------------------------------------------
-# Permute subtype labels to examine how well supervised model performs
-# nperm = 10000
-
-# make subtypes using z-scores computed from the mean and sd of the training set
-train_data = Dverbal_Discovery
-test_data = Dverbal_Replication
-mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-tmp_train = make_subtype(data2use = train_data,
-                         z_thresh = z_thresh,
-                         mean2use = mean2use,
-                         sd2use = sd2use)
-
-mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-tmp_test = make_subtype(data2use = test_data,
-                        z_thresh = z_thresh,
-                        mean2use = mean2use,
-                        sd2use = sd2use)
-
-acc = vector(length = nperm)
-for (iperm in 1:nperm){
-  # set seed for reproducibility
-  set.seed(iperm)
-  # compute model
-  permuted_labels = sample(tmp_train$z_ds_group)
-  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
-  pred_labels = predict(mod2use, tmp_test[,vars2use])
-  confmat = table(tmp_test$z_ds_group,pred_labels)
-  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-} # for (iperm in 1:nperm)
-
-df2plot = data.frame(Accuracy = acc)
-p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
-p
-
-# compute p-value
-pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
-pval
+#================================================================================
+#================================================================================
+# #------------------------------------------------------------------------------
+# # Permute subtype labels to examine how well supervised model performs
+#
+# # nperm = 10000
+#
+# # make subtypes using z-scores computed from the mean and sd of the training set
+# train_data = Dverbal_Discovery
+# test_data = Dverbal_Replication
+# mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# tmp_train = make_subtype(data2use = train_data,
+#                          z_thresh = z_thresh,
+#                          mean2use = mean2use,
+#                          sd2use = sd2use)
+#
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# tmp_test = make_subtype(data2use = test_data,
+#                         z_thresh = z_thresh,
+#                         mean2use = mean2use,
+#                         sd2use = sd2use)
+#
+# acc = vector(length = nperm)
+# for (iperm in 1:nperm){
+#   # set seed for reproducibility
+#   set.seed(iperm)
+#
+#   sc_perm = sample(train_data[,vars2use[1]])
+#   rrb_perm = sample(train_data[,vars2use[2]])
+#   perm_mean2use = mean(sc_perm - rrb_perm)
+#   perm_sd2use = sd(sc_perm - rrb_perm)
+#   # perm_mean2use = mean(train_data[,vars2use[1]] - rrb_perm)
+#   # perm_sd2use = sd(train_data[,vars2use[1]] - rrb_perm)
+#   pred_labels = make_subtype(data2use = tmp_test,
+#                         z_thresh = z_thresh,
+#                         mean2use = perm_mean2use,
+#                         sd2use = perm_sd2use)
+#   confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+#   acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+#
+#   # compute model
+#   permuted_labels = sample(tmp_train$z_ds_group)
+#   mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+#   pred_labels = predict(mod2use, tmp_test[,vars2use])
+#   confmat = table(tmp_test$z_ds_group,pred_labels)
+#   acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#   #============================================================================
+# } # for (iperm in 1:nperm)
+#
+# df2plot = data.frame(Accuracy = acc)
+# p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+# p
+#
+# # compute p-value
+# pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+# pval
+#================================================================================
+#================================================================================
 
 #------------------------------------------------------------------------------
 # Plot difference score Z subtypes in Discovery set
@@ -3146,12 +3404,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -3171,12 +3429,12 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
 p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
@@ -3190,19 +3448,18 @@ p
 # make SC and RRB percentages since EU-AIMS data is specified as percentages
 Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
 euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
-mask1 = euaims_data$Diagnosis=="ASD" 
-mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+mask1 = euaims_data$Diagnosis=="ASD"
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity))
 euaims_data = subset(euaims_data, (mask1 & !mask2))
-
 
 Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
 Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
-euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
-                               euaims_data$A2_pct_severity + 
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity +
+                               euaims_data$A2_pct_severity +
                                euaims_data$A3_pct_severity)/3
-euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
-                               euaims_data$B2_pct_severity + 
-                               euaims_data$B3_pct_severity + 
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity +
+                               euaims_data$B2_pct_severity +
+                               euaims_data$B3_pct_severity +
                                euaims_data$B4_pct_severity)/4
 
 train_data = Dverbal
@@ -3222,23 +3479,25 @@ tmp_test = make_subtype(data2use = test_data,
                         mean2use = mean2use,
                         sd2use = sd2use)
 
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-
-tmp_test$svm_pred_labels = pred_labels
-
-# plot confusion matrix
-setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
-pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
-         breaks= seq(0,100, length=100))
-setHook("grid.newpage", NULL, "replace")
-grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
-grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
-
-
+#===========================================================================
+#===========================================================================
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#
+# tmp_test$svm_pred_labels = pred_labels
+#
+# # plot confusion matrix
+# setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+# pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
+#          breaks= seq(0,100, length=100))
+# setHook("grid.newpage", NULL, "replace")
+# grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
+# grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
+#===========================================================================
+#===========================================================================
 
 # scatterplot
 p1 = ggplot(data = tmp_train, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("NDAR ALL")
@@ -3247,18 +3506,26 @@ p1
 p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL")
 p2
 
-p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
-p5_bottom_right = p3 + guides(colour=FALSE)
-ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
-p3
+#===========================================================================
+#===========================================================================
+# p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+# p5_bottom_right = p3 + guides(colour=FALSE)
+# ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+# p3
+#===========================================================================
+#===========================================================================
 
 # # write out EU-AIMS LEAP data with subgroups defined by NDAR All
 write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
 
-# Make final plot
-p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
-ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
-p_final
+#===========================================================================
+#===========================================================================
+# # Make final plot
+# p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+# ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+# p_final
+#===========================================================================
+#===========================================================================
 
 #------------------------------------------------------------------------------
 # Integrate subtypes with rest of EU-AIMS LEAP data
@@ -3268,7 +3535,12 @@ td_df$A_pct_severity = as.numeric(NA)
 td_df$B_pct_severity = as.numeric(NA)
 td_df$subgrp = "TD"
 
-cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+#===========================================================================
+#===========================================================================
+# cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","z_ds_group")
+#===========================================================================
+#===========================================================================
 tmp_asd = tmp_test[,cols2use]
 colnames(tmp_asd)[6] = "A_pct_severity"
 colnames(tmp_asd)[7] = "B_pct_severity"
@@ -3389,13 +3661,13 @@ res
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 data2use = subset(data2write,data2write$dataset=="Discovery")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
 cs_res
 
-# Replication 
+# Replication
 data2use = subset(data2write,data2write$dataset=="Replication")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
@@ -3424,19 +3696,19 @@ rownames(output_res) = vars2analyze
 output_res$varNames = vars2analyze
 
 for (ivar in 1:length(vars2analyze)){
-  
+
   y_var = vars2analyze[ivar]
   # print(y_var)
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Disc.fstat"] = res["subgrp","F-value"]
@@ -3445,30 +3717,30 @@ for (ivar in 1:length(vars2analyze)){
   #----------------------------------------------------------------------------
   # Replication
   df4mod = subset(df2use, df2use$dataset=="Replication")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Rep.fstat"] = res["subgrp","F-value"]
   output_res[y_var,"All_Rep.pval"] = res["subgrp","p-value"]
-  
+
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n1 = sum(df4mod$subgrp=="SC_equal_RRB")
   m1 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Disc.fstat"] = res["subgrp","F-value"]
@@ -3483,13 +3755,13 @@ for (ivar in 1:length(vars2analyze)){
   df4mod = subset(df2use, df2use$dataset=="Replication" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n2 = sum(df4mod$subgrp=="SC_equal_RRB")
   m2 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Rep.fstat"] = res["subgrp","F-value"]
@@ -3510,16 +3782,16 @@ for (ivar in 1:length(vars2analyze)){
                   sample = 2,
                   Type = 'ALL')
   output_res[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
-  
-  # make a plot  
+
+  # make a plot
   colors2use = get_ggColorHue(3)
   df4plot = subset(df2use, df2use$subgrp!="RRB_over_SC")
   p = ggplot(data = df4plot, aes_string(x = "subgrp", y = y_var, colour = "subgrp")) + facet_grid(. ~ dataset)
-  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) 
-  p = p + ylab(vnames[ivar]) + xlab("Group") + 
-    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) + 
+  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA)
+  p = p + ylab(vnames[ivar]) + xlab("Group") +
+    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) +
                        scale_colour_manual(values = c(colors2use[2:3],"grey60")) + guides(colour=FALSE) +
-    theme(text = element_text(size=fontSize-5), 
+    theme(text = element_text(size=fontSize-5),
         axis.text.x = element_text(size=fontSize-5),
         axis.text.y = element_text(size=fontSize-5))
   print(p)
@@ -3543,7 +3815,7 @@ z_thresh = 1
 
 # compute Discovery mean and sd
 ds_disc = Dverbal_Discovery[,vars2use[1]] - Dverbal_Discovery[,vars2use[2]]
-mean2use = mean(ds_disc) 
+mean2use = mean(ds_disc)
 sd2use = sd(ds_disc)
 
 Dverbal_Discovery = make_subtype(data2use = Dverbal_Discovery,
@@ -3564,12 +3836,12 @@ Dverbal_Replication = make_subtype(data2use = Dverbal_Replication,
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 table(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res = chisq.test(Dverbal_Discovery$z_ds_group,Dverbal_Discovery$sex)
 cs_res
 
-# Replication 
+# Replication
 table(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res = chisq.test(Dverbal_Replication$z_ds_group,Dverbal_Replication$sex)
 cs_res
@@ -3596,55 +3868,55 @@ res
 #------------------------------------------------------------------------------
 # Tests of differences in interview age across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = interview_age ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in SC across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_atotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in RRB across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = dbaes_btotal ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS SA CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_sa_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
 #------------------------------------------------------------------------------
 # Tests of differences in ADOS RRB CSS across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = ados_rrb_css ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -3652,11 +3924,11 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Tests of differences in IQ across the subtypes
 
-# Discovery 
+# Discovery
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Discovery)
 anova(mod2use)
 
-# Replication 
+# Replication
 mod2use = lm(formula = iq ~ z_ds_group, data = Dverbal_Replication)
 anova(mod2use)
 
@@ -3664,13 +3936,9 @@ anova(mod2use)
 #------------------------------------------------------------------------------
 # Make scatterplots with difference score Z subtypes in different colors
 maxScores = c(3,4)
-# fontSize = 20
 
-p_disc = ggplot(data = Dverbal_Discovery, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) + ggtitle("NDAR Discovery") + 
-  theme(text = element_text(size=fontSize), 
-        axis.text.x = element_text(size=fontSize),
-        axis.text.y = element_text(size=fontSize)) 
-p1_top_left = p_disc + guides(colour=FALSE) 
+p_disc = ggplot(data = Dverbal_Discovery, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) + ggtitle("NDAR Discovery")
+p1_top_left = p_disc + guides(colour=FALSE)
 ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Disc_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p1_top_left)
 p_disc
 table(Dverbal_Discovery$z_ds_group)
@@ -3678,11 +3946,8 @@ table(Dverbal_Discovery$z_ds_group)
 cor_res = cor.test(Dverbal_Discovery$dbaes_atotal, Dverbal_Discovery$dbaes_btotal)
 cor_res
 
-p_rep = ggplot(data = Dverbal_Replication, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) +  ggtitle("NDAR Replication") + 
-  theme(text = element_text(size=fontSize), 
-        axis.text.x = element_text(size=fontSize),
-        axis.text.y = element_text(size=fontSize)) 
-p2_bottom_left = p_rep + guides(colour=FALSE) 
+p_rep = ggplot(data = Dverbal_Replication, aes(x = dbaes_atotal, y = dbaes_btotal, colour = z_ds_group)) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) +  ggtitle("NDAR Replication")
+p2_bottom_left = p_rep + guides(colour=FALSE)
 ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Rep_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p2_bottom_left)
 p_rep
 table(Dverbal_Replication$z_ds_group)
@@ -3711,11 +3976,29 @@ tmp_test = make_subtype(data2use = test_data,
                         z_thresh = z_thresh,
                         mean2use = mean2use,
                         sd2use = sd2use)
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+
+#==============================================================================
+#==============================================================================
+# make labels based on train mean and sd
+mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+train_mean = mean2use
+train_sd = sd2use
+
+pred_labels = make_subtype(data2use = test_data,
+                        z_thresh = z_thresh,
+                        mean2use = train_mean,
+                        sd2use = train_sd)
+confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#==============================================================================
+#==============================================================================
 
 # plot confusion matrix
 setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
@@ -3730,46 +4013,66 @@ grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
 true_accuracy = acc
 true_accuracy
 
-#------------------------------------------------------------------------------
-# Permute subtype labels to examine how well supervised model performs
-# nperm = 10000
-
-# make subtypes using z-scores computed from the mean and sd of the training set
-train_data = Dverbal_Discovery
-test_data = Dverbal_Replication
-mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
-tmp_train = make_subtype(data2use = train_data,
-                         z_thresh = z_thresh,
-                         mean2use = mean2use,
-                         sd2use = sd2use)
-
-mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
-tmp_test = make_subtype(data2use = test_data,
-                        z_thresh = z_thresh,
-                        mean2use = mean2use,
-                        sd2use = sd2use)
-
-acc = vector(length = nperm)
-for (iperm in 1:nperm){
-  # set seed for reproducibility
-  set.seed(iperm)
-  # compute model
-  permuted_labels = sample(tmp_train$z_ds_group)
-  mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
-  pred_labels = predict(mod2use, tmp_test[,vars2use])
-  confmat = table(tmp_test$z_ds_group,pred_labels)
-  acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-} # for (iperm in 1:nperm)
-
-df2plot = data.frame(Accuracy = acc)
-p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
-p
-
-# compute p-value
-pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
-pval
+#================================================================================
+#================================================================================
+# #------------------------------------------------------------------------------
+# # Permute subtype labels to examine how well supervised model performs
+#
+# # nperm = 10000
+#
+# # make subtypes using z-scores computed from the mean and sd of the training set
+# train_data = Dverbal_Discovery
+# test_data = Dverbal_Replication
+# mean2use = mean(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# sd2use = sd(train_data[,vars2use[1]] - train_data[,vars2use[2]])
+# tmp_train = make_subtype(data2use = train_data,
+#                          z_thresh = z_thresh,
+#                          mean2use = mean2use,
+#                          sd2use = sd2use)
+#
+# mean2use = mean(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# sd2use = sd(test_data[,vars2use[1]] - test_data[,vars2use[2]])
+# tmp_test = make_subtype(data2use = test_data,
+#                         z_thresh = z_thresh,
+#                         mean2use = mean2use,
+#                         sd2use = sd2use)
+#
+# acc = vector(length = nperm)
+# for (iperm in 1:nperm){
+#   # set seed for reproducibility
+#   set.seed(iperm)
+#
+#   sc_perm = sample(train_data[,vars2use[1]])
+#   rrb_perm = sample(train_data[,vars2use[2]])
+#   perm_mean2use = mean(sc_perm - rrb_perm)
+#   perm_sd2use = sd(sc_perm - rrb_perm)
+#   # perm_mean2use = mean(train_data[,vars2use[1]] - rrb_perm)
+#   # perm_sd2use = sd(train_data[,vars2use[1]] - rrb_perm)
+#   pred_labels = make_subtype(data2use = tmp_test,
+#                         z_thresh = z_thresh,
+#                         mean2use = perm_mean2use,
+#                         sd2use = perm_sd2use)
+#   confmat = table(tmp_test$z_ds_group,pred_labels$z_ds_group)
+#   acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/dim(pred_labels)[1]
+#
+#   # compute model
+#   permuted_labels = sample(tmp_train$z_ds_group)
+#   mod2use = svm(x = tmp_train[,vars2use], y = permuted_labels)
+#   pred_labels = predict(mod2use, tmp_test[,vars2use])
+#   confmat = table(tmp_test$z_ds_group,pred_labels)
+#   acc[iperm] = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#   #============================================================================
+# } # for (iperm in 1:nperm)
+#
+# df2plot = data.frame(Accuracy = acc)
+# p = ggplot(data = df2plot, aes(x = Accuracy)) + geom_histogram() + geom_vline(xintercept=true_accuracy)
+# p
+#
+# # compute p-value
+# pval = sum(c(true_accuracy,acc)>=true_accuracy)/(nperm+1)
+# pval
+#================================================================================
+#================================================================================
 
 #------------------------------------------------------------------------------
 # Plot difference score Z subtypes in Discovery set
@@ -3784,18 +4087,15 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
-p = p + ylab("Percent Severity") + xlab("ADI-R subscale") + 
-  theme(text = element_text(size=fontSize), 
-        axis.text.x = element_text(size=fontSize),
-        axis.text.y = element_text(size=fontSize)) 
+p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
 p3_middle_top = p + guides(colour=FALSE)
 ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Disc_jitterplot_z%s.pdf",as.character(z_thresh))), plot = p3_middle_top)
 p
@@ -3812,18 +4112,15 @@ df2use$SC = df2use$dbaes_atotal
 df2use$RRB = df2use$dbaes_btotal
 
 df4plot = melt(df2use,
-               id.vars = c("subjectkey","subgrp"), 
+               id.vars = c("subjectkey","subgrp"),
                measure.vars = c("SC","RRB"))
 
-p = ggplot(data = df4plot, aes(x = variable, 
-                               y = value, 
-                               colour = subgrp, 
+p = ggplot(data = df4plot, aes(x = variable,
+                               y = value,
+                               colour = subgrp,
                                group = subjectkey)) + facet_grid(. ~ subgrp)
 p = p + geom_point(shape=1) + geom_line(alpha = 0.2) + ylim(0,1) + guides(color=FALSE)
-p = p + ylab("Percent Severity") + xlab("ADI-R subscale") + 
-  theme(text = element_text(size=fontSize), 
-        axis.text.x = element_text(size=fontSize),
-        axis.text.y = element_text(size=fontSize))
+p = p + ylab("Percent Severity") + xlab("ADI-R subscale")
 p4_middle_bottom = p + guides(colour=FALSE)
 ggsave(filename = file.path(plotpath, sprintf("final_NDAR_Rep_jitterplot_z%s.pdf",as.character(z_thresh))), plot = p4_middle_bottom)
 p
@@ -3834,19 +4131,18 @@ p
 # make SC and RRB percentages since EU-AIMS data is specified as percentages
 Dverbal = read.csv(file.path(datapath,"tidy_verbal.csv"))
 euaims_data = read.csv(file.path(datapath,"tidy_euaims.csv"))
-mask1 = euaims_data$Diagnosis=="ASD" 
-mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity)) 
+mask1 = euaims_data$Diagnosis=="ASD"
+mask2 =  (is.na(euaims_data$A1_pct_severity) | is.na(euaims_data$A2_pct_severity) | is.na(euaims_data$A3_pct_severity) | is.na(euaims_data$B1_pct_severity) | is.na(euaims_data$B2_pct_severity) | is.na(euaims_data$B3_pct_severity) | is.na(euaims_data$B4_pct_severity))
 euaims_data = subset(euaims_data, (mask1 & !mask2))
-
 
 Dverbal[,vars2use[1]] = Dverbal[,vars2use[1]]
 Dverbal[,vars2use[2]] = Dverbal[,vars2use[2]]
-euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity + 
-                               euaims_data$A2_pct_severity + 
+euaims_data[,vars2use[1]] = (euaims_data$A1_pct_severity +
+                               euaims_data$A2_pct_severity +
                                euaims_data$A3_pct_severity)/3
-euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity + 
-                               euaims_data$B2_pct_severity + 
-                               euaims_data$B3_pct_severity + 
+euaims_data[,vars2use[2]] = (euaims_data$B1_pct_severity +
+                               euaims_data$B2_pct_severity +
+                               euaims_data$B3_pct_severity +
                                euaims_data$B4_pct_severity)/4
 
 train_data = Dverbal
@@ -3866,52 +4162,58 @@ tmp_test = make_subtype(data2use = test_data,
                         mean2use = mean2use,
                         sd2use = sd2use)
 
-# compute model
-mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
-pred_labels = predict(mod2use, tmp_test[,vars2use])
-confmat = table(tmp_test$z_ds_group,pred_labels)
-acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
-
-tmp_test$svm_pred_labels = pred_labels
-
-# plot confusion matrix
-setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
-pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
-         breaks= seq(0,100, length=100))
-setHook("grid.newpage", NULL, "replace")
-grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
-grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
-
-
+#===========================================================================
+#===========================================================================
+# # compute model
+# mod2use = svm(x = tmp_train[,vars2use], y = tmp_train$z_ds_group)
+# pred_labels = predict(mod2use, tmp_test[,vars2use])
+# confmat = table(tmp_test$z_ds_group,pred_labels)
+# acc = (confmat[1,1]+confmat[2,2]+confmat[3,3])/length(pred_labels)
+#
+# tmp_test$svm_pred_labels = pred_labels
+#
+# # plot confusion matrix
+# setHook("grid.newpage", function() pushViewport(viewport(x=1,y=1,width=0.9, height=0.9, name="vp", just=c("right","top"))), action="prepend")
+# pheatmap(confmat/rowSums(confmat)*100, display_numbers = confmat, color = colorRampPalette(c('white','red'))(100), cluster_rows = FALSE, cluster_cols = FALSE, fontsize_number = fontSize, fontsize_row = fontSize, fontsize_col = fontSize,labels_row = c("RRB>SC","SC=RRB","SC>RRB"),labels_col = c("RRB>SC","SC=RRB","SC>RRB"),angle_col=90,
+#          breaks= seq(0,100, length=100))
+# setHook("grid.newpage", NULL, "replace")
+# grid::grid.text("Actual Labels", y=-0.07, gp=gpar(fontsize=fontSize))
+# grid::grid.text("Predicted Labels", x=-0.07, rot=90, gp=gpar(fontsize=fontSize))
+#===========================================================================
+#===========================================================================
 
 # scatterplot
-p1 = ggplot(data = tmp_train, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("NDAR ALL") + 
-  theme(text = element_text(size=fontSize),
-        axis.text.x = element_text(size=fontSize),
-        axis.text.y = element_text(size=fontSize))
+p1 = ggplot(data = tmp_train, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,1) + xlim(0,1) + ggtitle("NDAR ALL")
 p1
 
-p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("Social-Communication") + ylab("Restricted Repetitive Behaviors") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS with Groups from NDAR ALL") + 
+p2 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(z_ds_group))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,1) + xlim(0,1) + ggtitle("EU-AIMS with Groups from NDAR ALL") +
   theme(text = element_text(size=fontSize),
         axis.text.x = element_text(size=fontSize),
         axis.text.y = element_text(size=fontSize))
+p5_bottom_right = p2 + guides(colour=FALSE)
+ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
 p2
 
-p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS") + 
-  theme(text = element_text(size=fontSize),
-        axis.text.x = element_text(size=fontSize),
-        axis.text.y = element_text(size=fontSize))
-p5_bottom_right = p3 + guides(colour=FALSE)
-ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
-p3
+#===========================================================================
+#===========================================================================
+# p3 = ggplot(data = tmp_test, aes(x = dbaes_atotal, y = dbaes_btotal, colour = factor(pred_labels))) + geom_point() + xlab("SC") + ylab("RRB") + ylim(0,0.8) + xlim(0,0.8) + ggtitle("EU-AIMS")
+# p5_bottom_right = p3 + guides(colour=FALSE)
+# ggsave(filename = file.path(plotpath, sprintf("final_EUAIMS_scatterplot_z%s.pdf",as.character(z_thresh))), plot = p5_bottom_right)
+# p3
+#===========================================================================
+#===========================================================================
 
 # # write out EU-AIMS LEAP data with subgroups defined by NDAR All
 write.csv(tmp_test, file.path(datapath, sprintf("tidy_euaims_NDAR_subtypes_diffscore_z%s.csv",as.character(z_thresh))))
 
-# Make final plot
-p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
-ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
-p_final
+#===========================================================================
+#===========================================================================
+# # Make final plot
+# p_final = p1_top_left + p3_middle_top + plot_spacer() + p2_bottom_left + p4_middle_bottom + p5_bottom_right + plot_layout(nrow=3, ncol=3, widths = c(4,4,4), heights = c(8,8,8))
+# ggsave(filename = file.path(plotpath, sprintf("final_NDAR_EUAIMS_subtypes_plot_z%s.pdf",as.character(z_thresh))), plot = p_final)
+# p_final
+#===========================================================================
+#===========================================================================
 
 #------------------------------------------------------------------------------
 # Integrate subtypes with rest of EU-AIMS LEAP data
@@ -3921,7 +4223,12 @@ td_df$A_pct_severity = as.numeric(NA)
 td_df$B_pct_severity = as.numeric(NA)
 td_df$subgrp = "TD"
 
-cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+#===========================================================================
+#===========================================================================
+# cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","svm_pred_labels")
+cols2use = c("subid","age","Centre","Schedule","Diagnosis","dbaes_atotal","dbaes_btotal","z_ds_group")
+#===========================================================================
+#===========================================================================
 tmp_asd = tmp_test[,cols2use]
 colnames(tmp_asd)[6] = "A_pct_severity"
 colnames(tmp_asd)[7] = "B_pct_severity"
@@ -4029,7 +4336,6 @@ fname2save = here(sprintf("asd_subgrp_data_rsfmri_ALL_DSM5_diffzscoreGrps_z%s.cs
 write.csv(data2write,file = fname2save)
 
 
-
 #------------------------------------------------------------------------------
 # Descriptive stats
 df2use = data2write[,c("subid","Diagnosis","dataset","Centre","meanFD","age","sex","subgrp","viq_all","piq_all","fsiq4_all","A_pct_severity","B_pct_severity","ADI_social_total","ADI_communication_total","ADI_RRB_total","ados_2_SA_CSS","ados_2_RRB_CSS","SRS_tscore","SRS_tscore_self","RBS_total","SSP_total","vabsdscoresc_dss","vabsdscoresd_dss","vabsdscoress_dss","vabsabcabc_standard")]
@@ -4044,13 +4350,13 @@ res
 #------------------------------------------------------------------------------
 # Table of subtypes X sex
 
-# Discovery 
+# Discovery
 data2use = subset(data2write,data2write$dataset=="Discovery")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
 cs_res
 
-# Replication 
+# Replication
 data2use = subset(data2write,data2write$dataset=="Replication")
 table(data2use$subgrp,data2use$sex)
 cs_res = chisq.test(data2use$subgrp,data2use$sex)
@@ -4079,19 +4385,19 @@ rownames(output_res) = vars2analyze
 output_res$varNames = vars2analyze
 
 for (ivar in 1:length(vars2analyze)){
-  
+
   y_var = vars2analyze[ivar]
   # print(y_var)
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Disc.fstat"] = res["subgrp","F-value"]
@@ -4100,30 +4406,30 @@ for (ivar in 1:length(vars2analyze)){
   #----------------------------------------------------------------------------
   # Replication
   df4mod = subset(df2use, df2use$dataset=="Replication")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"All_Rep.fstat"] = res["subgrp","F-value"]
   output_res[y_var,"All_Rep.pval"] = res["subgrp","p-value"]
-  
+
   #----------------------------------------------------------------------------
   # Discovery
   df4mod = subset(df2use, df2use$dataset=="Discovery" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n1 = sum(df4mod$subgrp=="SC_equal_RRB")
   m1 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Disc.fstat"] = res["subgrp","F-value"]
@@ -4138,13 +4444,13 @@ for (ivar in 1:length(vars2analyze)){
   df4mod = subset(df2use, df2use$dataset=="Replication" & !is.element(df2use$subgrp,c("TD","RRB_over_SC")))
   n2 = sum(df4mod$subgrp=="SC_equal_RRB")
   m2 = sum(df4mod$subgrp=="SC_over_RRB")
-  
+
   # construct linear model
   # mixed-effect model: site as random factor, all other covariates as fixed factors
   fx_form = as.formula(sprintf("%s ~ %s",y_var,"subgrp"))
   rx_form = as.formula(sprintf("~ 1|%s","Centre"))
   mod2use = eval(substitute(lme(fixed = fx_form, random = rx_form, data = df4mod, na.action = na.omit)))
-  
+
   # run ANOVA
   res = anova(mod2use)
   output_res[y_var,"SCequalRRB_vs_SCoverRRB_Rep.fstat"] = res["subgrp","F-value"]
@@ -4165,16 +4471,16 @@ for (ivar in 1:length(vars2analyze)){
                   sample = 2,
                   Type = 'ALL')
   output_res[y_var,"SCequalRRB_vs_SCoverRRB.repBF"] = res_bf["Replication BF","Replication 1"]
-  
-  # make a plot  
+
+  # make a plot
   colors2use = get_ggColorHue(3)
   df4plot = subset(df2use, df2use$subgrp!="RRB_over_SC")
   p = ggplot(data = df4plot, aes_string(x = "subgrp", y = y_var, colour = "subgrp")) + facet_grid(. ~ dataset)
-  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA) 
-  p = p + ylab(vnames[ivar]) + xlab("Group") + 
-    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) + 
+  p = p + geom_jitter() + geom_boxplot(fill = NA, colour = "#000000", outlier.shape = NA)
+  p = p + ylab(vnames[ivar]) + xlab("Group") +
+    scale_x_discrete(labels=c("SC_equal_RRB"="SC=RRB","SC_over_RRB"="SC>RRB","TD"="TD")) +
                        scale_colour_manual(values = c(colors2use[2:3],"grey60")) + guides(colour=FALSE) +
-    theme(text = element_text(size=fontSize-5), 
+    theme(text = element_text(size=fontSize-5),
         axis.text.x = element_text(size=fontSize-5),
         axis.text.y = element_text(size=fontSize-5))
   print(p)
@@ -4189,22 +4495,22 @@ output_res
 # # plot Vineland ABC effect sizes over thresholds
 # tmp = data.frame(vabc)
 # tmp$threshold = factor(rownames(tmp))
-# 
+#
 # df2plot = melt(tmp)
 # p = ggplot(data = df2plot, aes(x = threshold, y =value, color=variable, group=variable)) + facet_grid(. ~ variable)
-# p = p + geom_line(size=4) + 
-#   geom_point(size=7) + 
-#   ylab("Cohen's d") + 
-#   xlab("Z-threshold") + 
-#   ylim(0,1) + 
+# p = p + geom_line(size=4) +
+#   geom_point(size=7) +
+#   ylab("Cohen's d") +
+#   xlab("Z-threshold") +
+#   ylim(0,1) +
 #   guides(color=FALSE) +
-#   theme(text = element_text(size=fontSize), 
+#   theme(text = element_text(size=fontSize),
 #         axis.text.x = element_text(size=fontSize),
 #         axis.text.y = element_text(size=fontSize))
 # p
 ```
 
-# Vineland ABC 
+# Vineland ABC
 
 ```{r, warning=FALSE, message=FALSE}
 # plot Vineland ABC effect sizes over thresholds
@@ -4213,13 +4519,13 @@ tmp$threshold = factor(rownames(tmp))
 
 df2plot = melt(tmp)
 p = ggplot(data = df2plot, aes(x = threshold, y =value, color=variable, group=variable)) + facet_grid(. ~ variable)
-p = p + geom_line(size=4) + 
-  geom_point(size=7) + 
-  ylab("Cohen's d") + 
-  xlab("Z-threshold") + 
-  ylim(0,1) + scale_colour_manual(values = c("dodger blue","#ff8d1e")) + 
+p = p + geom_line(size=4) +
+  geom_point(size=7) +
+  ylab("Cohen's d") +
+  xlab("Z-threshold") +
+  ylim(0,1) + scale_colour_manual(values = c("dodger blue","#ff8d1e")) +
   guides(color=FALSE) +
-  theme(text = element_text(size=fontSize), 
+  theme(text = element_text(size=fontSize),
         axis.text.x = element_text(size=fontSize),
         axis.text.y = element_text(size=fontSize))
 p
@@ -4269,11 +4575,11 @@ res
 cor.test(df4mod[,y_var],df4mod$z_ds)
 
 # replication Bayes Factor
-res_bf = BFSALL(tobs =t_disc, 
-                      trep = t_rep, 
-                      n1 = n_disc, 
+res_bf = BFSALL(tobs =t_disc,
+                      trep = t_rep,
+                      n1 = n_disc,
                       n2 = n_rep,
-                      sample = 1, 
+                      sample = 1,
                       Type = 'ALL')
 res_bf["Replication BF","Replication 1"]
 
@@ -4286,13 +4592,13 @@ df4plot[df4plot[,y_var]==999,y_var] = NA
 p = ggplot(data=df4plot, aes(x = z_ds, y = vabsabcabc_standard, colour = dataset)) + facet_grid(. ~ dataset)
 p = p + geom_point(size=3) + geom_smooth(method=lm) + xlab("Z SC-RRB") + ylab("Vineland ABC") +
   scale_colour_manual(values = c("dodger blue","#ff8d1e")) + guides(colour=FALSE) +
-  theme(text = element_text(size=fontSize), 
+  theme(text = element_text(size=fontSize),
         axis.text.x = element_text(size=fontSize),
         axis.text.y = element_text(size=fontSize))
 p
 ```
 
-# Vineland Daily Living Skills 
+# Vineland Daily Living Skills
 
 ```{r, warning=FALSE, message=FALSE}
 # plot Vineland Daily Living Skills effect sizes over thresholds
@@ -4301,13 +4607,13 @@ tmp$threshold = factor(rownames(tmp))
 
 df2plot = melt(tmp)
 p = ggplot(data = df2plot, aes(x = threshold, y =value, color=variable, group=variable)) + facet_grid(. ~ variable)
-p = p + geom_line(size=4) + 
-  geom_point(size=7) + 
-  ylab("Cohen's d") + 
-  xlab("Z-threshold") + 
-  ylim(0,1) + scale_colour_manual(values = c("dodger blue","#ff8d1e")) + 
+p = p + geom_line(size=4) +
+  geom_point(size=7) +
+  ylab("Cohen's d") +
+  xlab("Z-threshold") +
+  ylim(-0.1,1) + scale_colour_manual(values = c("dodger blue","#ff8d1e")) +
   guides(color=FALSE) +
-  theme(text = element_text(size=fontSize), 
+  theme(text = element_text(size=fontSize),
         axis.text.x = element_text(size=fontSize),
         axis.text.y = element_text(size=fontSize))
 p
@@ -4357,11 +4663,11 @@ res
 cor.test(df4mod[,y_var],df4mod$z_ds)
 
 # replication Bayes Factor
-res_bf = BFSALL(tobs =t_disc, 
-                      trep = t_rep, 
-                      n1 = n_disc, 
+res_bf = BFSALL(tobs =t_disc,
+                      trep = t_rep,
+                      n1 = n_disc,
                       n2 = n_rep,
-                      sample = 1, 
+                      sample = 1,
                       Type = 'ALL')
 res_bf["Replication BF","Replication 1"]
 
@@ -4374,7 +4680,7 @@ df4plot[df4plot[,y_var]==999,y_var] = NA
 p = ggplot(data=df4plot, aes(x = z_ds, y = vabsdscoresd_dss, colour = dataset)) + facet_grid(. ~ dataset)
 p = p + geom_point(size=3) + geom_smooth(method=lm) + xlab("Z SC-RRB") + ylab("Vineland Daily Living Skills") +
   scale_colour_manual(values = c("dodger blue","#ff8d1e")) + guides(colour=FALSE) +
-  theme(text = element_text(size=fontSize), 
+  theme(text = element_text(size=fontSize),
         axis.text.x = element_text(size=fontSize),
         axis.text.y = element_text(size=fontSize))
 p
